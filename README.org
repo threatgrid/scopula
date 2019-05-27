@@ -68,7 +68,7 @@ This is why the API only provide a remove-root-scope.
 
 ** Usage
 
-See [[./test/core_test.clj][./test/core_test.clj]]
+See [[./test/scopula/core_test.clj][./test/scopula/core_test.clj]
 
 ** License
 
