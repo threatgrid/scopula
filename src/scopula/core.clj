@@ -145,7 +145,7 @@
   (is-subsummed \"foo:read\" #{\"foo:read\" \"bar\"})
   (is-subsummed \"foo/sub/scope\" #{\"foo:read\"})"
   [repr-scope repr-scopes]
-  (not (every? #(not (repr-is-subscope? % repr-scope)) repr-scopes)))
+  (not (every? #(not (repr-is-subscope? repr-scope %)) repr-scopes)))
 
 (defn root-scope
   "display the root of a scope
@@ -169,19 +169,20 @@
          #{:write} ":write"
          "")))
 
-(defn- merge-accesses
+(defn merge-accesses
   [[path reprs]]
   {:path path
-   :access (set/union (map :access reprs))})
+   :access (apply set/union (map :access reprs))})
 
 (defn normalize-scopes
   "Given a set of scope remove reduntant ones"
   [scopes]
-  (let [scope-reps (map to-scope-repr scopes)
-        ssr (set scope-reps)]
-    (->> scope-reps
-         ;; (group-by :path)
-         ;; (map merge-accesses)
+  (let [ssr (->> scopes
+                 (map to-scope-repr)
+                 (group-by :path)
+                 (map merge-accesses)
+                 set)]
+    (->> ssr
          (filter #(not (repr-is-subsummed % (disj ssr %))))
          (map scope-repr-to-str)
          set)))

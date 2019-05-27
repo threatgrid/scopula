@@ -80,10 +80,19 @@
   (is (not (sut/is-root-scope? "foo/bar/baz"))))
 
 (deftest normalize-scopes-test
-  (comment
-    (sut/to-scope-repr "foo/bar/tux"))
+  (is (= #{"foo/bar"}
+         (sut/normalize-scopes #{"foo/bar/baz:read"
+                                 "foo/bar:write"
+                                 "foo/bar"})))
   (is (= #{"foo/bar"}
          (sut/normalize-scopes #{"foo/bar:read"
                                  "foo/bar:write"
-                                 "foo/bar/tux"})))
-  )
+                                 "foo/bar/tux"}))
+      "Should take care of making the unions of the accesses and remove subsummed scopes")
+
+  (is (= #{"foo/bar" "root"}
+         (sut/normalize-scopes #{"foo/bar:read"
+                                 "foo/bar:write"
+                                 "foo/bar/tux"
+                                 "root"}))
+      "Should take care of making the unions of the accesses and remove subsummed scopes"))
