@@ -96,3 +96,65 @@
                                  "foo/bar/tux"
                                  "root"}))
       "Should take care of making the unions of the accesses and remove subsummed scopes"))
+
+(deftest add-scopes-test
+  (is (= #{"foo" "bar"}
+         (sut/add-scope "bar" #{"foo"})))
+
+  (is (= #{"foo/bar" "root"}
+         (sut/add-scope "foo/bar:read" #{"foo/bar:write" "root"}))
+      "Should add scopes and take care of normalization"))
+
+(deftest scopes-union-test
+  (is (= #{"root2" "foo/bar" "root1"}
+         (sut/scope-union #{"foo/bar:read" "root2"}
+                          #{"foo/bar:write" "root1"}))
+      "Should union the scopes and take care of normalization"))
+
+(deftest raw-remove-root-scope-test
+  (is (= #{"baz/quux"}
+         (sut/raw-remove-root-scope "foo"
+                                    #{"foo/baz:read"
+                                      "foo/bar:write"
+                                      "baz/quux"})))
+
+  (is (= #{"baz/quux" "foo/baz:read"}
+         (sut/raw-remove-root-scope "foo:write"
+                                    #{"foo/baz:read"
+                                      "foo/bar:write"
+                                      "baz/quux"}))
+      "Limit to write access removal")
+
+  (is (= #{"foo/bar:write" "baz/quux"}
+         (sut/raw-remove-root-scope "foo:read"
+                                    #{"foo/bar:write" "baz/quux"
+                                      "foo/baz:read"}))
+      "Limit to read access removal")
+
+  (is (= {:ex-data {:scope "foo/bar"}
+          :ex-msg "We can't remove a sub scope, only root scope can be removed from a set of scopes, note access are supported"}
+         (try
+           (sut/raw-remove-root-scope "foo/bar"
+                                      #{"foo/bar:write" "baz/quux"})
+           (catch Exception e
+             {:ex-msg (.getMessage e)
+              :ex-data (ex-data e)})))
+      "Non root scope removal should throw an exception"))
+
+(deftest remove-root-scope-test
+  (is (= #{"foo/bar"}
+         (sut/remove-root-scope "baz"
+                                #{"foo/bar:read"
+                                  "foo/bar:write"
+                                  "baz/quux"}))
+      "Should take care of normalization"))
+
+
+(deftest remove-root-scopes-test
+  (is (= #{"foo/bar"}
+         (sut/remove-root-scopes #{"baz:read"
+                                   "baz:write"}
+                                 #{"foo/bar:read"
+                                   "foo/bar:write"
+                                   "baz/quux"}))
+      "Should take care of normalization on both inputs and outputs"))

@@ -169,7 +169,7 @@
          #{:write} ":write"
          "")))
 
-(defn merge-accesses
+(defn- merge-accesses
   [[path reprs]]
   {:path path
    :access (apply set/union (map :access reprs))})
@@ -187,22 +187,35 @@
          (map scope-repr-to-str)
          set)))
 
-(defn add-scopes
+(defn add-scope
+  "Add the scope to a set of scopes"
   [scope scopes]
-  (normalize-scopes (conj scope scopes)))
+  (normalize-scopes (cons scope scopes)))
 
 (defn scope-union
   [scopes-1 scopes-2]
   (normalize-scopes (set/union scopes-1 scopes-2)))
 
-(defn remove-root-scope
-  "remove a root scope from a set of scopes"
+(defn raw-remove-root-scope
+  "remove a root scope from a set of scopes."
   [root-scope-to-remove scopes]
   (if (is-root-scope? root-scope-to-remove)
-    (-> (for [scope scopes]
-          (when-not (is-subscope? scope root-scope-to-remove)
-            scope))
-        (remove nil?)
-        set)
-    (throw (ex-info "We can't remove a sub scope, only root scope can be removed from a set of scopes"
+    (->> (for [scope scopes]
+           (when-not (is-subscope? scope root-scope-to-remove)
+             scope))
+         (remove nil?)
+         set)
+    (throw (ex-info "We can't remove a sub scope, only root scope can be removed from a set of scopes, note access are supported"
                     {:scope root-scope-to-remove}))))
+
+(def remove-root-scope
+  (comp normalize-scopes raw-remove-root-scope))
+
+(defn remove-root-scopes
+  [root-scopes-to-remove scopes]
+  (->> root-scopes-to-remove
+       normalize-scopes
+       (reduce (fn [acc-scopes scope]
+                 (raw-remove-root-scope scope acc-scopes))
+               scopes)
+      normalize-scopes))
