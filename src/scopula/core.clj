@@ -175,7 +175,7 @@
    :access (apply set/union (map :access reprs))})
 
 (defn normalize-scopes
-  "Given a set of scope remove reduntant ones"
+  "Given a set of scope remove reduntant ones, and merge by access if possible"
   [scopes]
   (let [ssr (->> scopes
                  (map to-scope-repr)
