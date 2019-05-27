@@ -68,7 +68,25 @@ This is why the API only provide a remove-root-scope.
 
 ** Usage
 
-See [[./test/scopula/core_test.clj][./test/scopula/core_test.clj]
+Here is the API
+
+- =(is-scope-format-valid? str)=, return true if the string is a valid scope for
+  our convention,
+- =(is-subscope? scope-to-check super-scope)=, return true if the provided scope
+  is a subscope,
+- =(access-granted scopes required)=, return =true= if the =required= scope
+  are "contained" in the =scopes=,
+- =(root-scope scope)= returns the root-scope part of a scope
+- =(is-root-scope? scope)= returns true if the scope is a root-scope (access are
+  authorized)
+- =(normalize-scopes scopes)= remove all duplicate scopes, =normalize-scopes= is
+  idempotent ~(= identity (comp normalize-scopes normalize-scopes))~
+- =add-scope= to add one scope to a set of scopes
+- =scope-union= to make the union of two set of scopes
+- =remove-root-scope= to remove a root-scope (access accepted) from a set of scopes.
+- =remove-root-scopes= to remove some root-scopes (access accepted) from a set of scopes.
+
+See [[./test/core_test.clj][./test/core_test.clj]]
 
 ** License
 

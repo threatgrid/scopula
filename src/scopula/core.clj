@@ -91,11 +91,13 @@
     (= (take n super-lst) lst)))
 
 (defn repr-is-subscope?
+  "return true if the scope is a subscope of the super scope"
   [scope-to-check super-scope]
   (and (set/superset? (:access super-scope) (:access scope-to-check))
        (is-sub-list? (:path super-scope) (:path scope-to-check))))
 
 (defn is-subscope?
+  "return true if the scope-to-check is a subscope of the super-scope"
   [scope-to-check super-scope]
   (repr-is-subscope? (to-scope-repr scope-to-check)
                      (to-scope-repr super-scope)))
