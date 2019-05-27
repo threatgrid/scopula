@@ -86,7 +86,7 @@ Here is the API
 - =remove-root-scope= to remove a root-scope (access accepted) from a set of scopes.
 - =remove-root-scopes= to remove some root-scopes (access accepted) from a set of scopes.
 
-See [[./test/core_test.clj][./test/core_test.clj]]
+See [[./test/scopula/core_test.clj][./test/scopula/core_test.clj]]
 
 ** License
 
