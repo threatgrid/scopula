@@ -102,34 +102,18 @@
   (repr-is-subscope? (to-scope-repr scope-to-check)
                      (to-scope-repr super-scope)))
 
-(defn accepted-by-scopes
-  "scopes should be strings.
-  if none of the string contains a `/` nor a `:`.
-  It works as is a subset of.
+(defn scope-repr-to-str
+  [{:keys [path access]}]
+  (str (string/join "/" path)
+       (condp = access
+         #{:read} ":read"
+         #{:write} ":write"
+         "")))
 
-  :scopes #{\"foo\" \"bar\"}
-  only people with scopes which are super sets of
-  #{\"foo\" \"bar\"}
-  will be allowed to use the route.
-
-  scopes are considered as path with read/write access.
-  so \"foo/bar/baz:read\" is a sub-scope of \"foo\"
-  and of \"foo:read\".
-
-  So the more precise rule of access is.
-  All mandatory scopes must be sub-scopes of at least one user scopes.
-  "
-  [scopes required]
-  (every? (fn [req-scope]
-            (some #(repr-is-subscope? req-scope %) scopes))
-          required))
-
-(defn access-granted
-  "check that the first parameter contains all the required scopes
-  given as second parameter."
-  [scopes required]
-  (accepted-by-scopes (map to-scope-repr scopes)
-                      (map to-scope-repr required)))
+(defn- merge-accesses
+  [[path reprs]]
+  {:path path
+   :access (apply set/union (map :access reprs))})
 
 (defn repr-is-subsummed
   "return true if scope is contained by all the scopes
@@ -149,6 +133,85 @@
   [repr-scope repr-scopes]
   (not (every? #(not (repr-is-subscope? repr-scope %)) repr-scopes)))
 
+(defn repr-normalize-scopes
+  [scopes-repr]
+  (let [ssr (->> scopes-repr
+                 (group-by :path)
+                 (map merge-accesses)
+                 set)]
+    (->> ssr
+         (filter #(not (repr-is-subsummed % (disj ssr %))))
+         set)))
+
+(defn normalize-scopes
+  "Given a set of scope remove reduntant ones, and merge by access if possible"
+  [scopes]
+  (->> scopes
+       (map to-scope-repr)
+       repr-normalize-scopes
+       (map scope-repr-to-str)
+       set))
+
+(defn accepted-by-scopes
+  "scopes should be strings.
+  if none of the string contains a `/` nor a `:`.
+  It works as is a subset of.
+
+  :scopes #{\"foo\" \"bar\"}
+  only people with scopes which are super sets of
+  #{\"foo\" \"bar\"}
+  will be allowed to use the route.
+
+  scopes are considered as path with read/write access.
+  so \"foo/bar/baz:read\" is a sub-scope of \"foo\"
+  and of \"foo:read\".
+
+  So the more precise rule of access is.
+  All mandatory scopes must be sub-scopes of at least one user scopes.
+
+  Also mandatory the scopes and required should be normalized
+  "
+  [scopes required]
+  (every? (fn [req-scope]
+            (some #(repr-is-subscope? req-scope %) scopes))
+          required))
+
+(defn access-granted
+  "check that the first parameter contains all the required scopes
+  given as second parameter."
+  [scopes required]
+  (accepted-by-scopes (repr-normalize-scopes (map to-scope-repr scopes))
+                      (repr-normalize-scopes (map to-scope-repr required))))
+
+(def scopes-superset?
+  "Returns true if the first set of scopes is a superset of the second set of scopes.
+  This is another name for `access-granted` function"
+  access-granted)
+
+(defn scopes-subset?
+  "flipped version of scopes-superset?.
+  Returns true if the first set is a subset of the second set of scopes."
+  [required scopes]
+  (scopes-superset? scopes required))
+
+(defn repr-scopes-difference
+  "return the list of scopes that is not in "
+  [scopes-1 scopes-2]
+  (let [nsc-1 (repr-normalize-scopes scopes-1)
+        nsc-2  (repr-normalize-scopes scopes-2)]
+    (filter (fn [scope]
+              (not (some #(repr-is-subscope? scope %) nsc-2)))
+            nsc-1)))
+
+(defn scopes-difference
+  "return the set of scopes that is the first set of scopes without those
+  of the second set of scopes"
+  [scopes-1 scopes-2]
+  (->> (repr-scopes-difference (map to-scope-repr scopes-1)
+                               (map to-scope-repr scopes-2))
+       (map scope-repr-to-str)
+       set))
+
 (defn root-scope
   "display the root of a scope
 
@@ -163,31 +226,6 @@
   (= 1
      (count (-> scope to-scope-repr :path))))
 
-(defn scope-repr-to-str
-  [{:keys [path access]}]
-  (str (string/join "/" path)
-       (condp = access
-         #{:read} ":read"
-         #{:write} ":write"
-         "")))
-
-(defn- merge-accesses
-  [[path reprs]]
-  {:path path
-   :access (apply set/union (map :access reprs))})
-
-(defn normalize-scopes
-  "Given a set of scope remove reduntant ones, and merge by access if possible"
-  [scopes]
-  (let [ssr (->> scopes
-                 (map to-scope-repr)
-                 (group-by :path)
-                 (map merge-accesses)
-                 set)]
-    (->> ssr
-         (filter #(not (repr-is-subsummed % (disj ssr %))))
-         (map scope-repr-to-str)
-         set)))
 
 (defn add-scope
   "Add the scope to a set of scopes"

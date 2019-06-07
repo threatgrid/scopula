@@ -158,3 +158,56 @@
                                    "foo/bar:write"
                                    "baz/quux"}))
       "Should take care of normalization on both inputs and outputs"))
+
+(deftest scopes-superset-test
+  (testing "root scopes"
+    (is (sut/scopes-superset? #{} #{}))
+    (is (sut/scopes-superset? #{"foo"} #{}))
+    (is (sut/scopes-superset? #{"foo" "bar"} #{}))
+    (is (sut/scopes-superset? #{"foo" "bar"} #{"foo"}))
+    (is (sut/scopes-superset? #{"foo" "bar"} #{"foo" "bar"}))
+    (is (not (sut/scopes-superset? #{"foo" "bar"} #{"foo" "bar" "baz"}))))
+  (testing "sub scopes"
+    (is (sut/scopes-superset? #{"foo"} #{"foo/foo-1"}))
+    (is (sut/scopes-superset? #{"foo"} #{"foo/foo-1:read"}))
+    (is (sut/scopes-superset? #{"foo"} #{"foo:read"}))
+    (is (sut/scopes-superset? #{"foo"} #{"foo:read" "foo/foo-1"}))
+    (is (not (sut/scopes-superset? #{"foo:read"}
+                                   #{"foo:read" "foo/foo-1"}))))
+  (testing "un-normalized scopes"
+    (is (sut/scopes-superset? #{"foo:read" "foo:write"}
+                              #{"foo:read" "foo/foo-1"}))))
+
+(deftest scopes-subset-test
+  (testing "root scopes"
+    (is (sut/scopes-subset? #{} #{}))
+    (is (sut/scopes-subset? #{} #{"foo"}))
+    (is (sut/scopes-subset? #{} #{"foo" "bar"}))
+    (is (sut/scopes-subset? #{"foo"} #{"foo" "bar"}))
+    (is (sut/scopes-subset? #{"foo" "bar"} #{"foo" "bar"}))
+    (is (not (sut/scopes-subset? #{"foo" "bar" "baz"} #{"foo" "bar"}))))
+
+  (testing "sub scopes"
+    (is (sut/scopes-subset? #{"foo/foo-1"} #{"foo"}))
+    (is (sut/scopes-subset? #{"foo/foo-1:read"} #{"foo"}))
+    (is (sut/scopes-subset? #{"foo:read"} #{"foo"}))
+    (is (sut/scopes-subset? #{"foo:read" "foo/foo-1"} #{"foo"}))
+    (is (not (sut/scopes-subset? #{"foo:read" "foo/foo-1"}
+                                   #{"foo:read"}))))
+  (testing "un-normalized scopes"
+    (is (sut/scopes-subset? #{"foo:read" "foo/foo-1"}
+                            #{"foo:read" "foo:write"}))))
+
+(deftest scopes-difference-test
+  (is (= #{"foo/foo-1"}
+         (sut/scopes-difference #{"foo:read" "foo/foo-1"}
+                                #{"foo:read"})))
+
+  (is (= #{} (sut/scopes-difference #{"foo:read"}
+                                    #{"foo:read"})))
+  (is (= #{"baz"}
+         (sut/scopes-difference #{"foo" "bar" "baz"}
+                                #{"foo" "bar"})))
+  (is (= #{"baz" "bar/bar-1"}
+         (sut/scopes-difference #{"foo" "bar/bar-1" "baz"}
+                                #{"foo" "bar:read"}))))
