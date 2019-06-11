@@ -243,11 +243,13 @@
   (normalize-scopes (cons scope scopes)))
 
 (defn scope-union
+  "Unionize two set of scopes"
   [scopes-1 scopes-2]
   (normalize-scopes (set/union scopes-1 scopes-2)))
 
 (defn raw-remove-root-scope
-  "remove a root scope from a set of scopes."
+  "remove a root scope from a set of scopes.
+  You should, most of the time, use remove-root-scope"
   [root-scope-to-remove scopes]
   (if (is-root-scope? root-scope-to-remove)
     (->> (for [scope scopes]

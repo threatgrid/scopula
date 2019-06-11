@@ -85,6 +85,11 @@ Here is the API
 - =scope-union= to make the union of two set of scopes
 - =remove-root-scope= to remove a root-scope (access accepted) from a set of scopes.
 - =remove-root-scopes= to remove some root-scopes (access accepted) from a set of scopes.
+- =scope-root= show the root scope of a scope `(= "foo" (scope-root "foo/bar:read"))`
+- =remove-root-scopes= remove some root scopes to a set of scopes
+- =remove-root-scope= remove one scope to a set of scopes
+- =raw-remove-root-scope= remove one scope to a set of scopes without taking
+  care of normalization. You should almost never use this funciton.
 
 See [[./test/scopula/core_test.clj][./test/scopula/core_test.clj]]
 
