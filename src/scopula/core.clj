@@ -84,6 +84,16 @@
                "rw"    #{:read :write}
                nil     #{:read :write}
                #{})}))
+
+(defn scope-root
+  "display the root of a scope
+
+  >>> (scope-root \"foo/bar:read\")
+  foo
+  "
+  [scope]
+  (-> scope to-scope-repr :path first))
+
 (defn is-sub-list?
   "check scope-path-list starts with req-list"
   [lst super-lst]

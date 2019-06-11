@@ -2,6 +2,15 @@
   (:require [clojure.test :refer [deftest are is testing]]
             [scopula.core :as sut]))
 
+(deftest scope-root-test
+  (is "foo" (sut/scope-root "foo"))
+  (is "foo" (sut/scope-root "foo/bar"))
+  (is "foo" (sut/scope-root "foo/bar:read"))
+  (is "foo" (sut/scope-root "foo:read"))
+  (is "foo" (sut/scope-root "foo/bar/baz:read"))
+  (is "foo-bar" (sut/scope-root "foo-bar/baz:read"))
+  (is "foo.bar" (sut/scope-root "foo.bar/baz:read")))
+
 (deftest is-sub-list-test
   (is (sut/is-sub-list? ["a"] ["a" "b"]))
   (is (sut/is-sub-list? ["a" "b"] ["a" "b"]))
