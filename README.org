@@ -1,5 +1,12 @@
 * scopula
 
+  #+begin_quote
+Scopulae, or scopula pads, are dense tufts of hair at the end of a spiders's
+legs
+
+https://en.wikipedia.org/wiki/Scopulae
+  #+end_quote
+
 A Clojure library designed to manage a scope convention to handle fine grained
 authorization access.
 
@@ -59,16 +66,16 @@ are generally manipulated as a set of scopes.
 
 Scopes that do not have any subpath are called /root scopes/.
 
-This is important because it is easy to add, union scopes.
+This is important because it is easy to add some scopes to a set of scopes.
 But it is generally impossible to remove just a sub-scope as it would
 mean we should know all the sub-paths of some root-scope and add the difference.
-Scope are additive by their nature.
+Scopes are additive by their nature.
 
-This is why the API only provide a remove-root-scope.
+This is why the API only provide a =remove-root-scope= but not a =remove-scope= function.
 
 ** Usage
 
-Here is the API
+Here is an exerpt of the most useful functions of the API:
 
 - =(is-scope-format-valid? str)=, return true if the string is a valid scope for
   our convention,
@@ -79,19 +86,41 @@ Here is the API
 - =(root-scope scope)= returns the root-scope part of a scope
 - =(is-root-scope? scope)= returns true if the scope is a root-scope (access are
   authorized)
-- =(normalize-scopes scopes)= remove all duplicate scopes, =normalize-scopes= is
-  idempotent ~(= identity (comp normalize-scopes normalize-scopes))~
+- =scope-root= show the root scope of a scope `(= "foo" (scope-root "foo/bar:read"))`
+
+- =(normalize-scopes scopes)= normalize a set of scopes, remove all duplicates,
+  and merge scopes with all possible accesses, =normalize-scopes= is idempotent
+  ~(= identity (comp normalize-scopes normalize-scopes))~
+
+*** Adding scopes
+
 - =add-scope= to add one scope to a set of scopes
 - =scope-union= to make the union of two set of scopes
-- =remove-root-scope= to remove a root-scope (access accepted) from a set of scopes.
-- =remove-root-scopes= to remove some root-scopes (access accepted) from a set of scopes.
-- =scope-root= show the root scope of a scope `(= "foo" (scope-root "foo/bar:read"))`
+
+*** Removing scopes
+
 - =remove-root-scopes= remove some root scopes to a set of scopes
 - =remove-root-scope= remove one scope to a set of scopes
 - =raw-remove-root-scope= remove one scope to a set of scopes without taking
   care of normalization. You should almost never use this funciton.
 
-See [[./test/scopula/core_test.clj][./test/scopula/core_test.clj]]
+*** Scopes intersection
+
+- =scopes-intersection= returns either nil of the maximal intersection between
+  two scopes. For example =(scopes-intersection "foo:write" "foo/bar")= returns
+  =foo/bar:write=. Notice neither of =foo:write= and =foo/bar= are not subscope
+  of the other.
+- =scopes-intersect?= return true if two scopes intersects
+- =scopes-intersecting= is a non symmetric operation, that returns the list of
+  first scopes that intersect with some scopes of the second set of scopes.
+
+*** Notes
+
+The functions starting with =repr= takes scope representation as arguments. You
+shall generally not use them. This is why I dont mention them in this document.
+Still they are publicly exposed for advanced lib usage.
+
+For a lot more examples take a look at: [[./test/scopula/core_test.clj][./test/scopula/core_test.clj]]
 
 ** License
 

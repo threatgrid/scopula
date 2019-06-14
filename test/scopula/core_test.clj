@@ -220,3 +220,26 @@
   (is (= #{"baz" "bar/bar-1"}
          (sut/scopes-difference #{"foo" "bar/bar-1" "baz"}
                                 #{"foo" "bar:read"}))))
+
+(deftest scopes-intersection-test
+  (is (= "foo/bar:write"
+         (sut/scopes-intersection "foo:write" "foo/bar:write")))
+  (is (nil? (sut/scopes-intersection "foo" "bar"))))
+
+(deftest scopes-intersect?-test
+  (is (not (sut/scopes-intersect? "foo:write" "foo:read")))
+  (is (not (sut/scopes-intersect? "foo" "bar")))
+  (is (not (sut/scopes-intersect? "foo" "bar/foo")))
+  (is (sut/scopes-intersect? "foo" "foo"))
+  (is (sut/scopes-intersect? "foo/bar" "foo"))
+  (is (sut/scopes-intersect? "foo" "foo/bar"))
+  (is (sut/scopes-intersect? "foo:write" "foo/bar"))
+  (is (sut/scopes-intersect? "foo/bar" "foo:write")))
+
+(deftest scopes-intercepting-test
+  (is (= #{"foo:write"}
+         (sut/scopes-intersecting #{"foo:write" "bar:read"}
+                                  #{"foo/bar" "bar:write"})))
+  (is (= #{}
+         (sut/scopes-intersecting #{"foo:read" "bar:read"}
+                                  #{"foo/bar:write" "bar:write"}))))

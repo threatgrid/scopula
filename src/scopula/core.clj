@@ -120,7 +120,7 @@
          #{:write} ":write"
          "")))
 
-(defn- merge-accesses
+(defn merge-accesses
   [[path reprs]]
   {:path path
    :access (apply set/union (map :access reprs))})
@@ -271,3 +271,77 @@
                  (raw-remove-root-scope scope acc-scopes))
                scopes)
       normalize-scopes))
+
+;; INTERSECTION
+
+(defn repr-scopes-intersection
+  "return the maximal intersection between two sopes repr
+
+  `(to-scope-repr \"foo:write\")` and `(to-scope-repr \"foo/bar\")`
+  => `(to-scope-repr \"foo/bar:write\")`
+  "
+  [r1 r2]
+  (let [access (set/intersection (:access r1) (:access r2))]
+    (when (seq access)
+      (let [n1 (count (:path r1))
+            n2 (count (:path r2))
+            n (min n1 n2)
+            sub-path-1 (take n (:path r1))
+            sub-path-2 (take n (:path r2))]
+        (when (= sub-path-1 sub-path-2)
+          {:access access
+           :path (if (> n1 n2)
+                   (:path r1)
+                   (:path r2))})))))
+
+(defn scopes-intersection
+  "return the maximal intersection between two sopes
+
+  `foo:write` and `foo/bar` => `foo/bar:write`
+  "
+  [scope-1 scope-2]
+  (let [r1 (to-scope-repr scope-1)
+        r2 (to-scope-repr scope-2)]
+    (some->> (repr-scopes-intersection r1 r2)
+             scope-repr-to-str)))
+
+(defn repr-scopes-intersect?
+  "returns true if r1 and r2 intersect
+
+  For example: `(to-scope-repr foo:write)` and `(to-scope-repr foo/bar)`
+  intersect while neither of those scope repr is a subscope of another."
+  [r1 r2]
+  (and (boolean (seq (set/intersection (:access r1) (:access r2))))
+       (let [n (min (count (:path r1))
+                    (count (:path r2)))
+             sub-path-1 (take n (:path r1))
+             sub-path-2 (take n (:path r2))]
+         (= sub-path-1 sub-path-2))))
+
+(defn scopes-intersect?
+  "returns true if scope-1 and scope-2 intersect
+
+  For example: `foo:write` and `foo/bar` intersect while
+  neither of those scope is a subscope of another."
+  [scope-1 scope-2]
+  (let [r1 (to-scope-repr scope-1)
+        r2 (to-scope-repr scope-2)]
+    (repr-scopes-intersect? r1 r2)))
+
+(defn repr-scopes-intersecting
+  "Returns the list of first scopes repr that intersect with some scopes repr of
+  the second set of scopes repr"
+  [rs-1 rs-2]
+  (filter (fn [r-scope]
+            (some #(repr-scopes-intersect? % r-scope) rs-2))
+          rs-1))
+
+(defn scopes-intersecting
+  "Returns the list of first scopes that intersect with some scopes of the
+  second set of scopes"
+ [scopes-1 scopes-2]
+  (let [rs-1 (map to-scope-repr scopes-1)
+        rs-2 (map to-scope-repr scopes-2)]
+    (->> (repr-scopes-intersecting rs-1 rs-2)
+         (map scope-repr-to-str)
+         set)))
