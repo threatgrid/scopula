@@ -233,6 +233,68 @@ possible accesses, =normalize-scopes= is idempotent:
                              "root"}))
 #+end_src
 
+**** =add-scope=
+
+Add a scope to a set of scopes, and take cares of normalizing the result.
+
+#+begin_src clojure
+  (is (= #{"foo" "bar"}
+         (add-scope "bar" #{"foo"})))
+
+  (is (= #{"foo"}
+         (add-scope "foo:read" #{"foo:write"})))
+
+  (is (= #{"foo"}
+         (add-scope "foo/bar:read" #{"foo"})))
+#+end_src
+
+**** =scope-union=
+
+Union of two set of scopes
+
+#+begin_src clojure
+(is (= #{"root2" "foo/bar" "root1"}
+    (sut/scope-union #{"foo/bar:read" "root2"}
+                     #{"foo/bar:write" "root1"}))
+ "Should union the scopes and take care of normalization")
+#+end_src
+
+**** =remove-root-scope=
+
+Remove some root scope to a set of scopes
+
+#+begin_src clojure
+  (is (= #{"foo/bar"}
+         (sut/remove-root-scope "baz"
+                                #{"foo/bar:read"
+                                  "foo/bar:write"
+                                  "baz/quux"}))
+      "Should take care of normalization")
+  (is (= {:ex-msg
+          "We can't remove a sub scope, only root scope can be removed from a set of scopes, note access are supported",
+          :ex-data {:scope "baz/quux"}}
+         (try (sut/remove-root-scope "baz/quux"
+                                     #{"foo/bar:read"
+                                       "foo/bar:write"
+                                       "baz/quux"})
+              (catch Exception e
+                {:ex-msg (.getMessage e)
+                 :ex-data (ex-data e)})))
+      "Should throw an error if trying to remove a sub-scope")
+#+end_src
+
+**** =remove-root-scopes= remove one scope to a set of scopes
+- =raw-remove-root-scope= remove one scope to a set of scopes without taking
+  care of normalization. You should almost never use this funciton.
+- =scope-intersection= returns either nil of the maximal intersection between
+  two scopes. For example =(scopes-intersection "foo:write" "foo/bar")= returns
+  =foo/bar:write=. Notice neither of =foo:write= and =foo/bar= are not subscope
+  of the other.
+- =scopes-intersection= returns the intersection between two set of scopes.
+- =scopes-intersect?= return true if two scopes intersects
+- =scopes-intersecting= is an asymmetric operation, that returns the list of
+  first scopes that intersect with some scopes of the second set of scopes.
+
 *** Notes
 
 The functions starting with =repr= takes scope representation as arguments. You

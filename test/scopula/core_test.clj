@@ -123,12 +123,15 @@
                                  "root"}))
       "Should take care of making the unions of the accesses and remove subsummed scopes"))
 
-(deftest add-scopes-test
+(deftest add-scope-test
   (is (= #{"foo" "bar"}
          (sut/add-scope "bar" #{"foo"})))
 
+  (is (= #{"foo"}
+         (sut/add-scope "foo:read" #{"foo:write"})))
+
   (is (= #{"foo/bar" "root"}
-         (sut/add-scope "foo/bar:read" #{"foo/bar:write" "root"}))
+         (sut/add-scope "foo/bar:read" #{"foo/bar" "root"}))
       "Should add scopes and take care of normalization"))
 
 (deftest scopes-union-test
@@ -137,53 +140,57 @@
                           #{"foo/bar:write" "root1"}))
       "Should union the scopes and take care of normalization"))
 
-(deftest raw-remove-root-scope-test
-  (is (= #{"baz/quux"}
-         (sut/raw-remove-root-scope "foo"
-                                    #{"foo/baz:read"
-                                      "foo/bar:write"
-                                      "baz/quux"})))
+(deftest scope-disj-test
+  (is (= #{}
+         (sut/scope-disj #{"foo/bar" "foo/baz:read"} "foo")))
 
-  (is (= #{"baz/quux" "foo/baz:read"}
-         (sut/raw-remove-root-scope "foo:write"
-                                    #{"foo/baz:read"
-                                      "foo/bar:write"
-                                      "baz/quux"}))
-      "Limit to write access removal")
+  (is (= #{"foo/baz:read"}
+         (sut/scope-disj #{"foo/bar" "foo/baz:read"} "foo/bar")))
 
-  (is (= #{"foo/bar:write" "baz/quux"}
-         (sut/raw-remove-root-scope "foo:read"
-                                    #{"foo/bar:write" "baz/quux"
-                                      "foo/baz:read"}))
-      "Limit to read access removal")
+  (is (= #{"foo/bar:write"}
+         (sut/scope-disj #{"foo/bar"} "foo:read")))
 
-  (is (= {:ex-data {:scope "foo/bar"}
-          :ex-msg "We can't remove a sub scope, only root scope can be removed from a set of scopes, note access are supported"}
-         (try
-           (sut/raw-remove-root-scope "foo/bar"
-                                      #{"foo/bar:write" "baz/quux"})
-           (catch Exception e
-             {:ex-msg (.getMessage e)
-              :ex-data (ex-data e)})))
-      "Non root scope removal should throw an exception"))
+  (is (= {:ex-msg
+          "We can't remove a sub subscope of some other scope (access part is still supported)",
+          :ex-data {:scope "foo/bar/quux", :conflicting-scope "foo/bar"}}
+         (try (sut/scope-disj #{"foo/bar" "foo/baz:read"} "foo/bar/quux")
+              (catch Exception e
+                {:ex-msg (.getMessage e)
+                 :ex-data (ex-data e)})))))
 
-(deftest remove-root-scope-test
-  (is (= #{"foo/bar"}
-         (sut/remove-root-scope "baz"
-                                #{"foo/bar:read"
-                                  "foo/bar:write"
-                                  "baz/quux"}))
-      "Should take care of normalization"))
+(deftest scope-difference-test
+  (is (= {:ex-msg
+          "We can't remove a sub subscope of some other scope (access part is still supported)",
+          :ex-data {:scope "foo/foo-1/sub:read", :conflicting-scope "foo/foo-1"}}
+         (try (sut/scope-difference #{"foo/foo-1"}
+                                 #{"foo/foo-1/sub:read"})
+              (catch Exception e
+                {:ex-msg (.getMessage e)
+                 :ex-data (ex-data e)}))))
+  (is (= #{"foo/bar"} (sut/scope-difference
+                       #{"foo/bar:read"
+                         "foo/bar:write"
+                         "baz/quux"}
+                       #{"baz:read"
+                         "baz:write"}))
+      "Should take care of normalization on both inputs and outputs")
 
+  ;; notice how this does not provide the same result as scopes-missing
+  (is (= #{"foo/foo-1:write"}
+         (sut/scope-difference #{"foo:read" "foo/foo-1"}
+                                #{"foo:read"})))
 
-(deftest remove-root-scopes-test
-  (is (= #{"foo/bar"}
-         (sut/remove-root-scopes #{"baz:read"
-                                   "baz:write"}
-                                 #{"foo/bar:read"
-                                   "foo/bar:write"
-                                   "baz/quux"}))
-      "Should take care of normalization on both inputs and outputs"))
+  (is (= #{"baz" "bar/bar-1:write"}
+         (sut/scope-difference #{"foo" "bar/bar-1" "baz"}
+                            #{"foo" "bar:read"})))
+
+  (is (= #{} (sut/scope-difference #{"foo:read"}
+                                #{"foo:read"})))
+
+  (is (= #{"baz"}
+         (sut/scope-difference #{"foo" "bar" "baz"}
+                            #{"foo" "bar"})))
+  )
 
 (deftest scopes-superset-test
   (testing "root scopes"
@@ -224,18 +231,18 @@
     (is (sut/scopes-subset? #{"foo:read" "foo/foo-1"}
                             #{"foo:read" "foo:write"}))))
 
-(deftest scopes-difference-test
+(deftest scopes-missing-test
   (is (= #{"foo/foo-1"}
-         (sut/scopes-difference #{"foo:read" "foo/foo-1"}
+         (sut/scopes-missing #{"foo:read" "foo/foo-1"}
                                 #{"foo:read"})))
 
-  (is (= #{} (sut/scopes-difference #{"foo:read"}
+  (is (= #{} (sut/scopes-missing #{"foo:read"}
                                     #{"foo:read"})))
   (is (= #{"baz"}
-         (sut/scopes-difference #{"foo" "bar" "baz"}
+         (sut/scopes-missing #{"foo" "bar" "baz"}
                                 #{"foo" "bar"})))
   (is (= #{"baz" "bar/bar-1"}
-         (sut/scopes-difference #{"foo" "bar/bar-1" "baz"}
+         (sut/scopes-missing #{"foo" "bar/bar-1" "baz"}
                                 #{"foo" "bar:read"}))))
 
 (deftest scope-intersection-test
