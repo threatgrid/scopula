@@ -216,15 +216,7 @@
 
 (defn scopes-missing
   "return element of the first set of scopes removing those in the second set
-  of scopes
-
-  This is slightly different from scope-difference because
-
-  ex:
-
-
-
-  "
+  of scopes"
   [scopes-1 scopes-2]
   (->> (repr-scopes-missing (map to-scope-repr scopes-1)
                             (map to-scope-repr scopes-2))
@@ -251,27 +243,14 @@
   [scope scopes]
   (normalize-scopes (cons scope scopes)))
 
+(def scope-cons add-scope)
+
 (defn scope-union
   "Unionize two set of scopes"
   [scopes-1 scopes-2]
   (normalize-scopes (set/union scopes-1 scopes-2)))
 
-(defn raw-remove-root-scope
-  "remove a root scope from a set of scopes.
-  You should, most of the time, use remove-root-scope"
-  [root-scope-to-remove scopes]
-  (if (is-root-scope? root-scope-to-remove)
-    (->> (for [scope scopes]
-           (when-not (is-subscope? scope root-scope-to-remove)
-             scope))
-         (remove nil?)
-         set)
-    (throw (ex-info "We can't remove a sub scope, only root scope can be removed from a set of scopes, note access are supported"
-                    {:scope root-scope-to-remove}))))
-
-(def remove-root-scope
-  (comp normalize-scopes raw-remove-root-scope))
-
+;; ## Removing scopes
 
 (defn repr-is-strict-subpath?
   "return true if the first argument is strictly a sub path of the second argument"

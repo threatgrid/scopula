@@ -159,21 +159,12 @@
                  :ex-data (ex-data e)})))))
 
 (deftest scope-difference-test
-  (is (= {:ex-msg
-          "We can't remove a sub subscope of some other scope (access part is still supported)",
-          :ex-data {:scope "foo/foo-1/sub:read", :conflicting-scope "foo/foo-1"}}
-         (try (sut/scope-difference #{"foo/foo-1"}
-                                 #{"foo/foo-1/sub:read"})
-              (catch Exception e
-                {:ex-msg (.getMessage e)
-                 :ex-data (ex-data e)}))))
-  (is (= #{"foo/bar"} (sut/scope-difference
-                       #{"foo/bar:read"
-                         "foo/bar:write"
-                         "baz/quux"}
-                       #{"baz:read"
-                         "baz:write"}))
-      "Should take care of normalization on both inputs and outputs")
+  (is (= #{} (sut/scope-difference #{"foo:read"}
+                                   #{"foo:read"})))
+
+  (is (= #{"baz"}
+         (sut/scope-difference #{"foo" "bar" "baz"}
+                               #{"foo" "bar"})))
 
   ;; notice how this does not provide the same result as scopes-missing
   (is (= #{"foo/foo-1:write"}
@@ -184,13 +175,22 @@
          (sut/scope-difference #{"foo" "bar/bar-1" "baz"}
                             #{"foo" "bar:read"})))
 
-  (is (= #{} (sut/scope-difference #{"foo:read"}
-                                #{"foo:read"})))
+  (is (= #{"foo/bar"} (sut/scope-difference
+                       #{"foo/bar:read"
+                         "foo/bar:write"
+                         "baz/quux"}
+                       #{"baz:read"
+                         "baz:write"}))
+      "Should take care of normalization on both inputs and outputs")
 
-  (is (= #{"baz"}
-         (sut/scope-difference #{"foo" "bar" "baz"}
-                            #{"foo" "bar"})))
-  )
+  (is (= {:ex-msg
+          "We can't remove a sub subscope of some other scope (access part is still supported)",
+          :ex-data {:scope "foo/foo-1/sub:read", :conflicting-scope "foo/foo-1"}}
+         (try (sut/scope-difference #{"foo/foo-1"}
+                                    #{"foo/foo-1/sub:read"})
+              (catch Exception e
+                {:ex-msg (.getMessage e)
+                 :ex-data (ex-data e)})))))
 
 (deftest scopes-superset-test
   (testing "root scopes"
