@@ -87,10 +87,10 @@ Here is an exerpt of the most useful functions of the API:
 - =(is-root-scope? scope)= returns true if the scope is a root-scope (access are
   authorized)
 - =scope-root= show the root scope of a scope `(= "foo" (scope-root "foo/bar:read"))`
-
 - =(normalize-scopes scopes)= normalize a set of scopes, remove all duplicates,
   and merge scopes with all possible accesses, =normalize-scopes= is idempotent
   ~(= identity (comp normalize-scopes normalize-scopes))~
+
 
 *** Adding scopes
 
@@ -106,13 +106,132 @@ Here is an exerpt of the most useful functions of the API:
 
 *** Scopes intersection
 
-- =scopes-intersection= returns either nil of the maximal intersection between
+- =scope-intersection= returns either nil of the maximal intersection between
   two scopes. For example =(scopes-intersection "foo:write" "foo/bar")= returns
   =foo/bar:write=. Notice neither of =foo:write= and =foo/bar= are not subscope
   of the other.
+- =scopes-intersection= returns the intersection between two set of scopes.
 - =scopes-intersect?= return true if two scopes intersects
-- =scopes-intersecting= is a non symmetric operation, that returns the list of
+- =scopes-intersecting= is an asymmetric operation, that returns the list of
   first scopes that intersect with some scopes of the second set of scopes.
+
+*** Examples
+
+**** =is-scope-format-valid?=
+
+Return true if the string is a valid scope for our convention,
+
+#+begin_src clojure
+(is-scope-format-valid? "foo")
+(is-scope-format-valid? "foo/bar")
+(is-scope-format-valid? "foo-bar")
+(is-scope-format-valid? "foo.bar")
+(is-scope-format-valid? "foo/bar:read")
+(is-scope-format-valid? "foo/bar:write")
+(is-scope-format-valid? "foo/bar:rw")
+(is-scope-format-valid? "foo/bar@hsome.dns/sub/url")
+
+(not (is-scope-format-valid? "foo/bar:query"))
+(not (is-scope-format-valid? "foo/bar query"))
+(not (is-scope-format-valid? "foo/bar\nquery"))
+(not (is-scope-format-valid? "https://hsome.dns/sub/url")
+#+end_src
+
+**** =is-subscope?=
+Return true if the provided scope is a subscope of the the second one
+
+#+begin_src clojure
+(is-subscope? "foo" "foo")
+(is-subscope? "foo:read" "foo")
+(is-subscope? "foo/bar:read" "foo")
+(is-subscope? "foo/bar:read" "foo/bar")
+(is-subscope? "foo/bar:read" "foo:read")
+
+(not (is-subscope? "root/foo" "foo")
+#+end_src
+
+**** =access-granted= and =scopes-superset?=
+
+Return =true= if the first scopes contains all scopes of the second argument.
+
+#+begin_src clojure
+(testing "subset is accepted"
+  (is (access-granted #{"foo"} #{"foo"})
+      "an identical set of scopes should match")
+  (is (not (access-granted #{"foo"} #{"foo" "bar"}))
+      "A single scope when two are required should not be accepted")
+  (is (not (access-granted #{"bar"} #{"foo"})))
+  (is (access-granted #{"foo" "bar"} #{"foo"}))
+  (is (access-granted #{"foo" "bar"} #{"foo" "bar"}))
+  (is (not (access-granted #{"foo" "bar"} #{"foo" "bar" "baz"}))))
+(testing "superpath are accepted"
+  (is (not (access-granted #{"foo/bar"} #{"foo"})))
+  (is (not (access-granted #{"foo/bar/baz"} #{"foo"})))
+  (is (not (access-granted #{"foobar/baz"} #{"foo"}))))
+(testing "access are respected"
+  (is (access-granted #{"foo"}      #{"foo/bar:read"}     ))
+  (is (access-granted #{"foo"}      #{"foo/bar/baz:write"}))
+  (is (access-granted #{"foo"}      #{"foo/bar/baz:rw"}   ))
+  (is (access-granted #{"foo"}      #{"foo/bar/baz:rw"}   ))
+  (is (access-granted #{"foo:read"} #{"foo/bar/baz:read"} ))
+  (is (not (access-granted #{"foo:read"} #{"foo/bar/baz:write"})))
+  (is (access-granted #{"foo" "bar"} #{"foo/bar:read"}))
+  (is (access-granted #{"foo" "bar"}      #{"foo/bar/baz:write"}))
+  (is (access-granted #{"foo" "bar"}      #{"foo/bar/baz:rw"}   ))
+  (is (access-granted #{"foo" "bar"}      #{"foo/bar/baz:rw"}   ))
+  (is (access-granted #{"foo:read" "bar"} #{"foo/bar/baz:read"} ))
+  (is (not (access-granted #{"foo:read" "bar"} #{"foo/bar/baz:write"})))
+  (is (access-granted #{"foo" "bar"} #{"foo/bar:read" "bar"}     ))
+  (is (access-granted #{"foo" "bar"} #{"foo/bar/baz:write" "bar"}))
+  (is (access-granted #{"foo" "bar"} #{"foo/bar/baz:rw" "bar"}   ))
+  (is (access-granted #{"foo" "bar"} #{"foo/bar/baz:rw" "bar"}   ))
+  (is (access-granted #{"foo:read" "bar"} #{"foo/bar/baz:read" "bar"}))
+  (is (not (access-granted #{"foo:read" "bar"} #{"foo/bar/baz:write" "bar"}))))
+#+end_src
+
+**** =root-scope=
+
+Returns the root-scope part of a scope
+
+#+begin_src clojure
+  (= (root-scope "foo/bar:read")
+     "foo")
+#+end_src
+
+**** =is-root-scope?=
+
+Returns true if the scope is a root-scope (access are authorized)
+
+#+begin_src clojure
+  (is (is-root-scope? "foo"))
+  (is (is-root-scope? "foo:read"))
+
+  (is (not (is-root-scope? "foo/bar:read")))
+  (is (not (is-root-scope? "foo/bar")))
+#+end_src
+
+**** =normalize-scopes=
+
+Normalize a set of scopes, remove all duplicates, and merge scopes with all
+possible accesses, =normalize-scopes= is idempotent:
+~(= identity (comp normalize-scopes normalize-scopes))~
+
+#+begin_src clojure
+  (= #{"foo/bar"}
+     (sut/normalize-scopes #{"foo/bar/baz:read"
+                             "foo/bar:write"
+                             "foo/bar"}))
+
+  (= #{"foo/bar"}
+     (sut/normalize-scopes #{"foo/bar:read"
+                             "foo/bar:write"
+                             "foo/bar/tux"}))
+  (= #{"foo/bar" "root"}
+     (sut/normalize-scopes #{"foo/bar:read"
+                             "foo/bar:write"
+                             "foo/bar/tux"
+                             "root"}))
+#+end_src
 
 *** Notes
 

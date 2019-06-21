@@ -58,7 +58,7 @@
              [set :as set]
              [string :as string]]))
 
-(def scope-regex #"^[a-z0-9-]*(/[a-z0-9-]*)*(:(read|write|rw))?$")
+(def scope-regex #"^[^:\s\n]*(/[^:\s\n]*)*(:(read|write|rw))?$")
 
 (defn is-scope-format-valid?
   [scope]
@@ -274,7 +274,7 @@
 
 ;; INTERSECTION
 
-(defn repr-scopes-intersection
+(defn repr-scope-intersection
   "return the maximal intersection between two sopes repr
 
   `(to-scope-repr \"foo:write\")` and `(to-scope-repr \"foo/bar\")`
@@ -294,7 +294,7 @@
                    (:path r1)
                    (:path r2))})))))
 
-(defn scopes-intersection
+(defn scope-intersection
   "return the maximal intersection between two sopes
 
   `foo:write` and `foo/bar` => `foo/bar:write`
@@ -302,8 +302,26 @@
   [scope-1 scope-2]
   (let [r1 (to-scope-repr scope-1)
         r2 (to-scope-repr scope-2)]
-    (some->> (repr-scopes-intersection r1 r2)
+    (some->> (repr-scope-intersection r1 r2)
              scope-repr-to-str)))
+
+(defn repr-scopes-intersection
+  "return the intersection between two set of scope"
+  [sr1 sr2]
+  (->> (for [r1 sr1
+             r2 sr2]
+         (repr-scope-intersection r1 r2))
+       (remove nil?)
+       (repr-normalize-scopes)))
+
+(defn scopes-intersection
+  "return the intersection between two set of scope"
+  [scopes-1 scopes-2]
+  (let [sr1 (-> (map to-scope-repr scopes-1) repr-normalize-scopes)
+        sr2 (-> (map to-scope-repr scopes-2) repr-normalize-scopes)]
+    (->> (repr-scopes-intersection sr1 sr2)
+         (map scope-repr-to-str)
+         set)))
 
 (defn repr-scopes-intersect?
   "returns true if r1 and r2 intersect
@@ -329,16 +347,16 @@
     (repr-scopes-intersect? r1 r2)))
 
 (defn repr-scopes-intersecting
-  "Returns the list of first scopes repr that intersect with some scopes repr of
-  the second set of scopes repr"
+  "Asymetrical operation; returns the list of first scopes repr that intersect
+  with some scopes repr of the second set of scopes repr"
   [rs-1 rs-2]
   (filter (fn [r-scope]
             (some #(repr-scopes-intersect? % r-scope) rs-2))
           rs-1))
 
 (defn scopes-intersecting
-  "Returns the list of first scopes that intersect with some scopes of the
-  second set of scopes"
+  "Asymmetrical operation; returns the list of first scopes that intersect with
+  some scopes of the second set of scopes"
  [scopes-1 scopes-2]
   (let [rs-1 (map to-scope-repr scopes-1)
         rs-2 (map to-scope-repr scopes-2)]

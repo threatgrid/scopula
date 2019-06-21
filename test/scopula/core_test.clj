@@ -2,6 +2,21 @@
   (:require [clojure.test :refer [deftest are is testing]]
             [scopula.core :as sut]))
 
+(deftest is-scope-format-valid-test
+  (is (sut/is-scope-format-valid? "foo"))
+  (is (sut/is-scope-format-valid? "foo/bar"))
+  (is (sut/is-scope-format-valid? "foo-bar"))
+  (is (sut/is-scope-format-valid? "foo.bar"))
+  (is (sut/is-scope-format-valid? "foo/bar:read"))
+  (is (sut/is-scope-format-valid? "foo/bar:write"))
+  (is (sut/is-scope-format-valid? "foo/bar:rw"))
+  (is (not (sut/is-scope-format-valid? "foo/bar:query")))
+  (is (not (sut/is-scope-format-valid? "foo/bar query")))
+  (is (not (sut/is-scope-format-valid? "foo/bar\nquery")))
+  (is (sut/is-scope-format-valid? "foo/bar@hsome.dns/sub/url"))
+  (is (not (sut/is-scope-format-valid? "https://hsome.dns/sub/url"))
+      "The : in the url si not supported"))
+
 (deftest scope-root-test
   (is "foo" (sut/scope-root "foo"))
   (is "foo" (sut/scope-root "foo/bar"))
@@ -19,6 +34,9 @@
 (deftest is-subscopes-test
   (is (sut/is-subscope? "foo" "foo"))
   (is (sut/is-subscope? "foo:read" "foo"))
+  (is (sut/is-subscope? "foo/bar:read" "foo"))
+  (is (sut/is-subscope? "foo/bar:read" "foo/bar"))
+  (is (sut/is-subscope? "foo/bar:read" "foo:read"))
 
   (is (not (sut/is-subscope? "root/foo" "foo"))))
 
@@ -74,7 +92,6 @@
     (is (sut/access-granted #{"foo" "bar"} #{"foo/bar/baz:rw" "bar"}   ))
     (is (sut/access-granted #{"foo:read" "bar"} #{"foo/bar/baz:read" "bar"}))
     (is (not (sut/access-granted #{"foo:read" "bar"} #{"foo/bar/baz:write" "bar"})))))
-
 
 (deftest root-scope-test
   (is (= "foo" (sut/root-scope "foo")))
@@ -221,10 +238,22 @@
          (sut/scopes-difference #{"foo" "bar/bar-1" "baz"}
                                 #{"foo" "bar:read"}))))
 
-(deftest scopes-intersection-test
+(deftest scope-intersection-test
   (is (= "foo/bar:write"
-         (sut/scopes-intersection "foo:write" "foo/bar:write")))
-  (is (nil? (sut/scopes-intersection "foo" "bar"))))
+         (sut/scope-intersection "foo:write" "foo/bar:write")))
+  (is (nil? (sut/scope-intersection "foo" "bar"))))
+
+(deftest scopes-interception-test
+  (is (= #{"foo/bar:write"}
+         (sut/scopes-intersection #{"foo:write" "bar:read"}
+                                  #{"foo/bar" "bar:write"})))
+  (is (= #{"bar" "foo/bar:write"}
+         (sut/scopes-intersection #{"foo:write" "bar:read" "bar:write"}
+                                  #{"foo/bar" "bar"}))
+      "Check normalization")
+  (is (= #{}
+         (sut/scopes-intersection #{"foo:read" "bar:read"}
+                                  #{"foo/bar:write" "bar:write"}))))
 
 (deftest scopes-intersect?-test
   (is (not (sut/scopes-intersect? "foo:write" "foo:read")))
