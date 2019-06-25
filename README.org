@@ -71,48 +71,330 @@ But it is generally impossible to remove just a sub-scope as it would
 mean we should know all the sub-paths of some root-scope and add the difference.
 Scopes are additive by their nature.
 
-This is why the API only provide a =remove-root-scope= but not a =remove-scope= function.
-
 ** Usage
 
-Here is an exerpt of the most useful functions of the API:
+*** Basic functionalities
 
-- =(is-scope-format-valid? str)=, return true if the string is a valid scope for
-  our convention,
-- =(is-subscope? scope-to-check super-scope)=, return true if the provided scope
-  is a subscope,
-- =(access-granted scopes required)=, return =true= if the =required= scope
-  are "contained" in the =scopes=,
-- =(root-scope scope)= returns the root-scope part of a scope
-- =(is-root-scope? scope)= returns true if the scope is a root-scope (access are
-  authorized)
-- =scope-root= show the root scope of a scope `(= "foo" (scope-root "foo/bar:read"))`
+**** =is-scope-format-valid?=
 
-- =(normalize-scopes scopes)= normalize a set of scopes, remove all duplicates,
-  and merge scopes with all possible accesses, =normalize-scopes= is idempotent
-  ~(= identity (comp normalize-scopes normalize-scopes))~
+Return true if the string is a valid scope for our convention,
 
-*** Adding scopes
+#+begin_src clojure
+(is-scope-format-valid? "foo")
+(is-scope-format-valid? "foo/bar")
+(is-scope-format-valid? "foo-bar")
+(is-scope-format-valid? "foo.bar")
+(is-scope-format-valid? "foo/bar:read")
+(is-scope-format-valid? "foo/bar:write")
+(is-scope-format-valid? "foo/bar:rw")
+(is-scope-format-valid? "foo/bar@hsome.dns/sub/url")
 
-- =add-scope= to add one scope to a set of scopes
-- =scope-union= to make the union of two set of scopes
+(not (is-scope-format-valid? "foo/bar:query"))
+(not (is-scope-format-valid? "foo/bar query"))
+(not (is-scope-format-valid? "foo/bar\nquery"))
+(not (is-scope-format-valid? "https://hsome.dns/sub/url")
+#+end_src
 
-*** Removing scopes
+**** =is-subscope?=
+Return true if the provided scope is a subscope of the the second one
 
-- =remove-root-scopes= remove some root scopes to a set of scopes
-- =remove-root-scope= remove one scope to a set of scopes
-- =raw-remove-root-scope= remove one scope to a set of scopes without taking
-  care of normalization. You should almost never use this funciton.
+#+begin_src clojure
+(is-subscope? "foo" "foo")
+(is-subscope? "foo:read" "foo")
+(is-subscope? "foo/bar:read" "foo")
+(is-subscope? "foo/bar:read" "foo/bar")
+(is-subscope? "foo/bar:read" "foo:read")
 
-*** Scopes intersection
+(not (is-subscope? "root/foo" "foo")
+#+end_src
 
-- =scopes-intersection= returns either nil of the maximal intersection between
-  two scopes. For example =(scopes-intersection "foo:write" "foo/bar")= returns
-  =foo/bar:write=. Notice neither of =foo:write= and =foo/bar= are not subscope
-  of the other.
-- =scopes-intersect?= return true if two scopes intersects
-- =scopes-intersecting= is a non symmetric operation, that returns the list of
-  first scopes that intersect with some scopes of the second set of scopes.
+**** =access-granted= and =scopes-superset?=
+
+Return =true= if the first scopes contains all scopes of the second argument.
+
+#+begin_src clojure
+(testing "subset is accepted"
+  (is (access-granted #{"foo"} #{"foo"})
+      "an identical set of scopes should match")
+  (is (not (access-granted #{"foo"} #{"foo" "bar"}))
+      "A single scope when two are required should not be accepted")
+  (is (not (access-granted #{"bar"} #{"foo"})))
+  (is (access-granted #{"foo" "bar"} #{"foo"}))
+  (is (access-granted #{"foo" "bar"} #{"foo" "bar"}))
+  (is (not (access-granted #{"foo" "bar"} #{"foo" "bar" "baz"}))))
+(testing "superpath are accepted"
+  (is (not (access-granted #{"foo/bar"} #{"foo"})))
+  (is (not (access-granted #{"foo/bar/baz"} #{"foo"})))
+  (is (not (access-granted #{"foobar/baz"} #{"foo"}))))
+(testing "access are respected"
+  (is (access-granted #{"foo"}      #{"foo/bar:read"}     ))
+  (is (access-granted #{"foo"}      #{"foo/bar/baz:write"}))
+  (is (access-granted #{"foo"}      #{"foo/bar/baz:rw"}   ))
+  (is (access-granted #{"foo"}      #{"foo/bar/baz:rw"}   ))
+  (is (access-granted #{"foo:read"} #{"foo/bar/baz:read"} ))
+  (is (not (access-granted #{"foo:read"} #{"foo/bar/baz:write"})))
+  (is (access-granted #{"foo" "bar"} #{"foo/bar:read"}))
+  (is (access-granted #{"foo" "bar"}      #{"foo/bar/baz:write"}))
+  (is (access-granted #{"foo" "bar"}      #{"foo/bar/baz:rw"}   ))
+  (is (access-granted #{"foo" "bar"}      #{"foo/bar/baz:rw"}   ))
+  (is (access-granted #{"foo:read" "bar"} #{"foo/bar/baz:read"} ))
+  (is (not (access-granted #{"foo:read" "bar"} #{"foo/bar/baz:write"})))
+  (is (access-granted #{"foo" "bar"} #{"foo/bar:read" "bar"}     ))
+  (is (access-granted #{"foo" "bar"} #{"foo/bar/baz:write" "bar"}))
+  (is (access-granted #{"foo" "bar"} #{"foo/bar/baz:rw" "bar"}   ))
+  (is (access-granted #{"foo" "bar"} #{"foo/bar/baz:rw" "bar"}   ))
+  (is (access-granted #{"foo:read" "bar"} #{"foo/bar/baz:read" "bar"}))
+  (is (not (access-granted #{"foo:read" "bar"} #{"foo/bar/baz:write" "bar"}))))
+#+end_src
+
+**** =root-scope=
+
+Returns the root-scope part of a scope
+
+#+begin_src clojure
+  (= (root-scope "foo/bar:read")
+     "foo")
+#+end_src
+
+**** =is-root-scope?=
+
+Returns true if the scope is a root-scope (access are authorized)
+
+#+begin_src clojure
+  (is (is-root-scope? "foo"))
+  (is (is-root-scope? "foo:read"))
+
+  (is (not (is-root-scope? "foo/bar:read")))
+  (is (not (is-root-scope? "foo/bar")))
+#+end_src
+
+**** =normalize-scopes=
+
+Normalize a set of scopes, remove all duplicates, and merge scopes with all
+possible accesses, =normalize-scopes= is idempotent:
+~(= identity (comp normalize-scopes normalize-scopes))~
+
+#+begin_src clojure
+  (= #{"foo/bar"}
+     (sut/normalize-scopes #{"foo/bar/baz:read"
+                             "foo/bar:write"
+                             "foo/bar"}))
+
+  (= #{"foo/bar"}
+     (sut/normalize-scopes #{"foo/bar:read"
+                             "foo/bar:write"
+                             "foo/bar/tux"}))
+  (= #{"foo/bar" "root"}
+     (sut/normalize-scopes #{"foo/bar:read"
+                             "foo/bar:write"
+                             "foo/bar/tux"
+                             "root"}))
+#+end_src
+
+*** Set-like API
+
+**** =add-scope=, or =scope-cons=
+
+Add a scope to a set of scopes, and take cares of normalizing the result.
+
+#+begin_src clojure
+  (is (= #{"foo" "bar"}
+         (add-scope "bar" #{"foo"})))
+
+  (is (= #{"foo"}
+         (add-scope "foo:read" #{"foo:write"})))
+
+  (is (= #{"foo"}
+         (add-scope "foo/bar:read" #{"foo"})))
+#+end_src
+
+**** =scope-union=
+
+Union of two set of scopes
+
+#+begin_src clojure
+(is (= #{"root2" "foo/bar" "root1"}
+    (sut/scope-union #{"foo/bar:read" "root2"}
+                     #{"foo/bar:write" "root1"}))
+ "Should union the scopes and take care of normalization")
+#+end_src
+
+**** =scope-disj=
+
+remove one scope from a set of scopes
+
+#+begin_src clojure
+  (is (= #{}
+         (sut/scope-disj #{"foo/bar" "foo/baz:read"} "foo")))
+
+  (is (= #{"foo/baz:read"}
+         (sut/scope-disj #{"foo/bar" "foo/baz:read"} "foo/bar")))
+
+  (is (= #{"foo/bar:write"}
+         (sut/scope-disj #{"foo/bar"} "foo:read")))
+
+  (is (= {:ex-msg
+          "We can't remove a sub subscope of some other scope (access part is still supported)",
+          :ex-data {:scope "foo/bar/quux", :conflicting-scope "foo/bar"}}
+         (try (sut/scope-disj #{"foo/bar" "foo/baz:read"} "foo/bar/quux")
+              (catch Exception e
+                {:ex-msg (.getMessage e)
+                 :ex-data (ex-data e)}))))
+#+end_src
+
+**** =scope-difference=
+
+Remove scopes from the second set of scopes to the first set of scopes.
+Notice, this function is not total. For some entry it could throw an exception.
+
+For example, there is no way value for: =(scope-difference #{"foo"} #{"foo/bar"})=
+
+Because it would mean that we should be able to know all subscopes used in our
+application. So this operation is not supported
+
+#+begin_src clojure
+  (is (= #{} (sut/scope-difference #{"foo:read"}
+                                   #{"foo:read"})))
+
+  (is (= #{"baz"}
+         (sut/scope-difference #{"foo" "bar" "baz"}
+                               #{"foo" "bar"})))
+
+  (is (= #{"baz" "bar/bar-1:write"}
+         (sut/scope-difference #{"foo" "bar/bar-1" "baz"}
+                               #{"foo" "bar:read"})))
+
+  (is (= #{"foo/foo-1:write"}
+         (sut/scope-difference #{"foo:read" "foo/foo-1"}
+                                #{"foo:read"})))
+
+  (is (= {:ex-msg
+          "We can't remove a sub subscope of some other scope (access part is still supported)",
+          :ex-data {:scope "foo/foo-1/sub:read", :conflicting-scope "foo/foo-1"}}
+         (try (sut/scope-difference #{"foo/foo-1"}
+                                 #{"foo/foo-1/sub:read"})
+              (catch Exception e
+                {:ex-msg (.getMessage e)
+                 :ex-data (ex-data e)}))))
+
+  (is (= #{"foo/bar"} (sut/scope-difference
+                       #{"foo/bar:read"
+                         "foo/bar:write"
+                         "baz/quux"}
+                       #{"baz:read"
+                         "baz:write"}))
+      "Should take care of normalization on both inputs and outputs")
+#+end_src
+
+**** =scopes-superset?=
+
+Check if the first set of scopes contains the second set of scopes. Mainly it is
+true if the first set of scopes provide access to all scopes of the second set
+of scopes.
+
+
+#+begin_src clojure
+(deftest scopes-superset-test
+  (testing "root scopes"
+    (is (sut/scopes-superset? #{} #{}))
+    (is (sut/scopes-superset? #{"foo"} #{}))
+    (is (sut/scopes-superset? #{"foo" "bar"} #{}))
+    (is (sut/scopes-superset? #{"foo" "bar"} #{"foo"}))
+    (is (sut/scopes-superset? #{"foo" "bar"} #{"foo" "bar"}))
+    (is (not (sut/scopes-superset? #{"foo" "bar"} #{"foo" "bar" "baz"}))))
+  (testing "sub scopes"
+    (is (sut/scopes-superset? #{"foo"} #{"foo/foo-1"}))
+    (is (sut/scopes-superset? #{"foo"} #{"foo/foo-1:read"}))
+    (is (sut/scopes-superset? #{"foo"} #{"foo:read"}))
+    (is (sut/scopes-superset? #{"foo"} #{"foo:read" "foo/foo-1"}))
+    (is (not (sut/scopes-superset? #{"foo:read"}
+                                   #{"foo:read" "foo/foo-1"}))))
+  (testing "un-normalized scopes"
+    (is (sut/scopes-superset? #{"foo:read" "foo:write"}
+                              #{"foo:read" "foo/foo-1"}))))
+#+end_src
+
+**** =scopes-subset?=
+
+Test if a set of scopes is contained by another set of scopes. Mainly it is true
+if the second set of scopes provide access to all scopes of the first set of
+scopes.
+
+#+begin_src clojure
+(deftest scopes-subset-test
+  (testing "root scopes"
+    (is (sut/scopes-subset? #{} #{}))
+    (is (sut/scopes-subset? #{} #{"foo"}))
+    (is (sut/scopes-subset? #{} #{"foo" "bar"}))
+    (is (sut/scopes-subset? #{"foo"} #{"foo" "bar"}))
+    (is (sut/scopes-subset? #{"foo" "bar"} #{"foo" "bar"}))
+    (is (not (sut/scopes-subset? #{"foo" "bar" "baz"} #{"foo" "bar"}))))
+
+  (testing "sub scopes"
+    (is (sut/scopes-subset? #{"foo/foo-1"} #{"foo"}))
+    (is (sut/scopes-subset? #{"foo/foo-1:read"} #{"foo"}))
+    (is (sut/scopes-subset? #{"foo:read"} #{"foo"}))
+    (is (sut/scopes-subset? #{"foo:read" "foo/foo-1"} #{"foo"}))
+    (is (not (sut/scopes-subset? #{"foo:read" "foo/foo-1"}
+                                   #{"foo:read"}))))
+  (testing "un-normalized scopes"
+    (is (sut/scopes-subset? #{"foo:read" "foo/foo-1"}
+                            #{"foo:read" "foo:write"}))))
+#+end_src
+
+**** =scopes-intersection=
+
+Returns the intersection between two set of scopes.
+
+#+begin_src clojure
+  (deftest scopes-interception-test
+
+    (is (= #{}
+           (sut/scopes-intersection #{"bar:read"}
+                                    #{"bar:write"})))
+
+
+    (is (= #{"foo/bar:write"}
+           (sut/scopes-intersection #{"foo:write"}
+                                    #{"foo/bar"})))
+
+    (is (= #{"foo/bar:write"}
+           (sut/scopes-intersection #{"foo:write" "bar:read"}
+                                    #{"foo/bar" "bar:write"})))
+
+
+    (is (= #{"bar" "foo/bar:write"}
+           (sut/scopes-intersection #{"foo:write" "bar:read" "bar:write"}
+                                    #{"foo/bar" "bar"}))
+        "Normalize input and output")
+#+end_src
+
+**** =scopes-missing=
+
+Returns elements of the first set of scopes removing those in the second set of
+scopes.
+
+While close to =scope-difference= the behavior is slightly different. Sometime
+you want to provide the list of scopes in a set and not construct new one when
+presenting messages to the customer.
+
+#+begin_src clojure
+(deftest scopes-missing-test
+  (is (= #{"foo/foo-1"}
+         (sut/scopes-missing #{"foo:read" "foo/foo-1"}
+                                #{"foo:read"})))
+
+  (is (= #{} (sut/scopes-missing #{"foo:read"}
+                                    #{"foo:read"})))
+  (is (= #{"baz"}
+         (sut/scopes-missing #{"foo" "bar" "baz"}
+                                #{"foo" "bar"})))
+  (is (= #{"baz" "bar/bar-1"}
+         (sut/scopes-missing #{"foo" "bar/bar-1" "baz"}
+                                #{"foo" "bar:read"}))))
+#+end_src
+
+
 
 *** Notes
 

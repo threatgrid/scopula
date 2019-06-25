@@ -58,7 +58,7 @@
              [set :as set]
              [string :as string]]))
 
-(def scope-regex #"^[a-z0-9-]*(/[a-z0-9-]*)*(:(read|write|rw))?$")
+(def scope-regex #"^[^:\s\n]*(/[^:\s\n]*)*(:(read|write|rw))?$")
 
 (defn is-scope-format-valid?
   [scope]
@@ -105,6 +105,7 @@
   [scope-to-check super-scope]
   (and (set/superset? (:access super-scope) (:access scope-to-check))
        (is-sub-list? (:path super-scope) (:path scope-to-check))))
+
 
 (defn is-subscope?
   "return true if the scope-to-check is a subscope of the super-scope"
@@ -204,8 +205,8 @@
   [required scopes]
   (scopes-superset? scopes required))
 
-(defn repr-scopes-difference
-  "return the list of scopes that is not in "
+(defn repr-scopes-missing
+  "return the list of scopes-1 that is not in scopes-2"
   [scopes-1 scopes-2]
   (let [nsc-1 (repr-normalize-scopes scopes-1)
         nsc-2  (repr-normalize-scopes scopes-2)]
@@ -213,12 +214,12 @@
               (not (some #(repr-is-subscope? scope %) nsc-2)))
             nsc-1)))
 
-(defn scopes-difference
-  "return the set of scopes that is the first set of scopes without those
-  of the second set of scopes"
+(defn scopes-missing
+  "return element of the first set of scopes removing those in the second set
+  of scopes"
   [scopes-1 scopes-2]
-  (->> (repr-scopes-difference (map to-scope-repr scopes-1)
-                               (map to-scope-repr scopes-2))
+  (->> (repr-scopes-missing (map to-scope-repr scopes-1)
+                            (map to-scope-repr scopes-2))
        (map scope-repr-to-str)
        set))
 
@@ -242,39 +243,96 @@
   [scope scopes]
   (normalize-scopes (cons scope scopes)))
 
+(def scope-cons add-scope)
+
 (defn scope-union
   "Unionize two set of scopes"
   [scopes-1 scopes-2]
   (normalize-scopes (set/union scopes-1 scopes-2)))
 
-(defn raw-remove-root-scope
-  "remove a root scope from a set of scopes.
-  You should, most of the time, use remove-root-scope"
-  [root-scope-to-remove scopes]
-  (if (is-root-scope? root-scope-to-remove)
-    (->> (for [scope scopes]
-           (when-not (is-subscope? scope root-scope-to-remove)
-             scope))
-         (remove nil?)
-         set)
-    (throw (ex-info "We can't remove a sub scope, only root scope can be removed from a set of scopes, note access are supported"
-                    {:scope root-scope-to-remove}))))
+;; ## Removing scopes
 
-(def remove-root-scope
-  (comp normalize-scopes raw-remove-root-scope))
+(defn repr-is-strict-subpath?
+  "return true if the first argument is strictly a sub path of the second argument"
+  [r1 r2]
+  (let [n1 (count (:path r1))
+        n2 (count (:path r2))]
+    (and (> n1 n2)
+         (= (take n2 (:path r1))
+            (:path r2)))))
 
-(defn remove-root-scopes
-  [root-scopes-to-remove scopes]
-  (->> root-scopes-to-remove
-       normalize-scopes
-       (reduce (fn [acc-scopes scope]
-                 (raw-remove-root-scope scope acc-scopes))
-               scopes)
-      normalize-scopes))
+(defn repr-scope-remove
+  "While inputs should be in repr form,
+
+  remove the single scope `rs-to-remove` from the single scope `rs`
+  returns `nil` if the two scopes do not intersect.
+
+  If the operation is not possible (for example, remove `foo/bar` from `foo`)
+  this function throw an exception.
+
+  If the two scopes intersect for the path but their access is different that
+  mean some access should be remove. As exemple, removing `foo:write` from
+  `foo/bar/baz` should endup with `foo/bar/baz:read`."
+  [rs rs-to-remove]
+  (when (repr-is-strict-subpath? rs-to-remove rs)
+    (throw (ex-info "We can't remove a sub subscope of some other scope (access part is still supported)"
+                    {:scope (scope-repr-to-str rs-to-remove)
+                     :conflicting-scope (scope-repr-to-str rs)})))
+  (if (is-sub-list? (:path rs-to-remove) (:path rs))
+    (when-let [access (seq (set/intersection (:access rs)
+                                             (set/difference #{:read :write}
+                                                             (:access rs-to-remove))))]
+      {:path (:path rs)
+       :access (set access)})
+    rs))
+
+(defn raw-repr-scope-disj
+  "remove a scope from a set of scopes"
+  [rscopes rs-to-remove]
+  (set (keep #(repr-scope-remove % rs-to-remove) rscopes)))
+
+(defn repr-scope-disj
+  "remove a scope for a set of scopes.
+  Will throw an exception if the scope to remove is a subscope of some scope in
+  the scopeset"
+  [repr-scopes rs-to-rm]
+  (let [rr (repr-normalize-scopes repr-scopes)]
+    (raw-repr-scope-disj rr rs-to-rm)))
+
+(defn scope-disj
+  "remove a scope from a set of scope. Throw an error if trying to remove a
+  subscope of an existing scope"
+  [scopes scope-to-remove]
+  (let [rss (->> scopes (map to-scope-repr) set)
+        rs-to-rm (to-scope-repr scope-to-remove)]
+    (->> (repr-scope-disj rss rs-to-rm)
+         (map scope-repr-to-str)
+         set)))
+
+(defn scope-difference
+  "a lot similar to scopes-missing but take care of throwing an exception if
+  some sub-scope cannot be removed. This would prevent an error when trying to
+  reduce a set of scopes.
+
+
+  (scope-difference #{\"foo/bar\"} #{\"foo:write\"})
+  => #{\"foo/bar:read\"}
+
+  keep foo/bar but removed all :write from super-scope foo."
+  [scopes scopes-to-remove]
+  (let [nrss (->> scopes (map to-scope-repr) set repr-normalize-scopes)
+        nrsr (->> scopes-to-remove (map to-scope-repr) set repr-normalize-scopes)]
+    (->> nrsr
+         (reduce (fn [acc-repr-scopes rscope]
+                   (raw-repr-scope-disj acc-repr-scopes rscope))
+                 nrss)
+         repr-normalize-scopes
+         (map scope-repr-to-str)
+         set)))
 
 ;; INTERSECTION
 
-(defn repr-scopes-intersection
+(defn repr-scope-intersection
   "return the maximal intersection between two sopes repr
 
   `(to-scope-repr \"foo:write\")` and `(to-scope-repr \"foo/bar\")`
@@ -294,7 +352,7 @@
                    (:path r1)
                    (:path r2))})))))
 
-(defn scopes-intersection
+(defn scope-intersection
   "return the maximal intersection between two sopes
 
   `foo:write` and `foo/bar` => `foo/bar:write`
@@ -302,8 +360,26 @@
   [scope-1 scope-2]
   (let [r1 (to-scope-repr scope-1)
         r2 (to-scope-repr scope-2)]
-    (some->> (repr-scopes-intersection r1 r2)
+    (some->> (repr-scope-intersection r1 r2)
              scope-repr-to-str)))
+
+(defn repr-scopes-intersection
+  "return the intersection between two set of scope"
+  [sr1 sr2]
+  (->> (for [r1 sr1
+             r2 sr2]
+         (repr-scope-intersection r1 r2))
+       (remove nil?)
+       (repr-normalize-scopes)))
+
+(defn scopes-intersection
+  "return the intersection between two set of scope"
+  [scopes-1 scopes-2]
+  (let [sr1 (-> (map to-scope-repr scopes-1) repr-normalize-scopes)
+        sr2 (-> (map to-scope-repr scopes-2) repr-normalize-scopes)]
+    (->> (repr-scopes-intersection sr1 sr2)
+         (map scope-repr-to-str)
+         set)))
 
 (defn repr-scopes-intersect?
   "returns true if r1 and r2 intersect
@@ -329,16 +405,16 @@
     (repr-scopes-intersect? r1 r2)))
 
 (defn repr-scopes-intersecting
-  "Returns the list of first scopes repr that intersect with some scopes repr of
-  the second set of scopes repr"
+  "Asymetrical operation; returns the list of first scopes repr that intersect
+  with some scopes repr of the second set of scopes repr"
   [rs-1 rs-2]
   (filter (fn [r-scope]
             (some #(repr-scopes-intersect? % r-scope) rs-2))
           rs-1))
 
 (defn scopes-intersecting
-  "Returns the list of first scopes that intersect with some scopes of the
-  second set of scopes"
+  "Asymmetrical operation; returns the list of first scopes that intersect with
+  some scopes of the second set of scopes"
  [scopes-1 scopes-2]
   (let [rs-1 (map to-scope-repr scopes-1)
         rs-2 (map to-scope-repr scopes-2)]
