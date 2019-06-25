@@ -206,7 +206,7 @@
   (scopes-superset? scopes required))
 
 (defn repr-scopes-missing
-  "return the list of scopes that is not in "
+  "return the list of scopes-1 that is not in scopes-2"
   [scopes-1 scopes-2]
   (let [nsc-1 (repr-normalize-scopes scopes-1)
         nsc-2  (repr-normalize-scopes scopes-2)]
@@ -261,25 +261,35 @@
          (= (take n2 (:path r1))
             (:path r2)))))
 
+(defn repr-scope-remove
+  "While inputs should be in repr form,
+
+  remove the single scope `rs-to-remove` from the single scope `rs`
+  returns `nil` if the two scopes do not intersect.
+
+  If the operation is not possible (for example, remove `foo/bar` from `foo`)
+  this function throw an exception.
+
+  If the two scopes intersect for the path but their access is different that
+  mean some access should be remove. As exemple, removing `foo:write` from
+  `foo/bar/baz` should endup with `foo/bar/baz:read`."
+  [rs rs-to-remove]
+  (when (repr-is-strict-subpath? rs-to-remove rs)
+    (throw (ex-info "We can't remove a sub subscope of some other scope (access part is still supported)"
+                    {:scope (scope-repr-to-str rs-to-remove)
+                     :conflicting-scope (scope-repr-to-str rs)})))
+  (if (is-sub-list? (:path rs-to-remove) (:path rs))
+    (when-let [access (seq (set/intersection (:access rs)
+                                             (set/difference #{:read :write}
+                                                             (:access rs-to-remove))))]
+      {:path (:path rs)
+       :access (set access)})
+    rs))
+
 (defn raw-repr-scope-disj
+  "remove a scope from a set of scopes"
   [rscopes rs-to-remove]
-  (->> (for [rs rscopes]
-         (do
-           (when (repr-is-strict-subpath? rs-to-remove rs)
-             (throw (ex-info "We can't remove a sub subscope of some other scope (access part is still supported)"
-                             {:scope (scope-repr-to-str rs-to-remove)
-                              :conflicting-scope (scope-repr-to-str rs)})))
-           (if (is-sub-list? (:path rs-to-remove) (:path rs))
-             (when-let [access (seq (set/intersection
-                                     (:access rs)
-                                     (set/difference
-                                      #{:read :write}
-                                      (:access rs-to-remove))))]
-               {:path (:path rs)
-                :access (set access)})
-             rs)))
-       (remove nil?)
-       set))
+  (set (keep #(repr-scope-remove % rs-to-remove) rscopes)))
 
 (defn repr-scope-disj
   "remove a scope for a set of scopes.
