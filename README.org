@@ -1,3 +1,5 @@
+[[https://clojars.org/scopula][https://img.shields.io/clojars/v/scopula.svg]]
+
 * scopula
 
   #+begin_quote
