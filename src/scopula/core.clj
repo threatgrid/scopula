@@ -58,7 +58,14 @@
              [set :as set]
              [string :as string]]))
 
-(def scope-regex #"^[^:\s\n]*(/[^:\s\n]*)*(:(read|write|rw))?$")
+(def allowed-chars-no-colon "[!#-9;-\\[\\]-~]")
+(def allowed-word (str allowed-chars-no-colon "+"))
+
+(def scope-regex (re-pattern (str
+                              "^" allowed-word ;; root-scope
+                              "(/" allowed-word ")*" ;; path of sub-scopes
+                              "(:(read|write|rw))?$" ;; read write or rw
+                              )))
 
 (defn is-scope-format-valid?
   [scope]
