@@ -408,7 +408,7 @@ For a lot more examples take a look at: [[./test/scopula/core_test.clj][./test/s
 
 ** License
 
-Copyright © 2019 Cisco
+Copyright © 2019- Cisco
 
 Distributed under the Eclipse Public License either version 1.0 or (at your
 option) any later version.
