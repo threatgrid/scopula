@@ -283,7 +283,14 @@
   [rs rs-to-remove]
   (when (repr-is-strict-subpath? rs-to-remove rs)
     (throw (ex-info "We can't remove a sub subscope of some other scope (access part is still supported)"
-                    {:scope (scope-repr-to-str rs-to-remove)
+                    {:ex-origin ::scopula
+                     :ex-type ::impossible-sub-scope-removal
+                     :ex-full-msg
+                     (format (str "By nature we cannot remove a subscope from another scope. "
+                                  "You tried to remove %s but this conflict with %s")
+                             (scope-repr-to-str rs-to-remove)
+                             (scope-repr-to-str rs))
+                     :scope (scope-repr-to-str rs-to-remove)
                      :conflicting-scope (scope-repr-to-str rs)})))
   (if (is-sub-list? (:path rs-to-remove) (:path rs))
     (when-let [access (seq (set/intersection (:access rs)

@@ -157,7 +157,13 @@
 
   (is (= {:ex-msg
           "We can't remove a sub subscope of some other scope (access part is still supported)",
-          :ex-data {:scope "foo/bar/quux", :conflicting-scope "foo/bar"}}
+          :ex-data
+          {:ex-origin :scopula.core/scopula,
+           :ex-type :scopula.core/impossible-sub-scope-removal,
+           :ex-full-msg
+           "By nature we cannot remove a subscope from another scope. You tried to remove foo/bar/quux but this conflict with foo/bar",
+           :scope "foo/bar/quux",
+           :conflicting-scope "foo/bar"}}
          (try (sut/scope-disj #{"foo/bar" "foo/baz:read"} "foo/bar/quux")
               (catch Exception e
                 {:ex-msg (.getMessage e)
@@ -174,11 +180,11 @@
   ;; notice how this does not provide the same result as scopes-missing
   (is (= #{"foo/foo-1:write"}
          (sut/scope-difference #{"foo:read" "foo/foo-1"}
-                                #{"foo:read"})))
+                               #{"foo:read"})))
 
   (is (= #{"baz" "bar/bar-1:write"}
          (sut/scope-difference #{"foo" "bar/bar-1" "baz"}
-                            #{"foo" "bar:read"})))
+                               #{"foo" "bar:read"})))
 
   (is (= #{"foo/bar"} (sut/scope-difference
                        #{"foo/bar:read"
@@ -190,8 +196,29 @@
 
   (is (= {:ex-msg
           "We can't remove a sub subscope of some other scope (access part is still supported)",
-          :ex-data {:scope "foo/foo-1/sub:read", :conflicting-scope "foo/foo-1"}}
+          :ex-data
+          {:ex-origin :scopula.core/scopula,
+           :ex-type :scopula.core/impossible-sub-scope-removal,
+           :ex-full-msg
+           "By nature we cannot remove a subscope from another scope. You tried to remove foo/foo-1/sub:read but this conflict with foo/foo-1",
+           :scope "foo/foo-1/sub:read",
+           :conflicting-scope "foo/foo-1"}}
          (try (sut/scope-difference #{"foo/foo-1"}
+                                    #{"foo/foo-1/sub:read"})
+              (catch Exception e
+                {:ex-msg (.getMessage e)
+                 :ex-data (ex-data e)}))))
+
+  (is (= {:ex-msg
+          "We can't remove a sub subscope of some other scope (access part is still supported)",
+          :ex-data
+          {:ex-origin :scopula.core/scopula,
+           :ex-type :scopula.core/impossible-sub-scope-removal,
+           :ex-full-msg
+           "By nature we cannot remove a subscope from another scope. You tried to remove foo/foo-1/sub:read but this conflict with foo/foo-1",
+           :scope "foo/foo-1/sub:read",
+           :conflicting-scope "foo/foo-1"}}
+         (try (sut/scope-difference #{"foo/foo-1" "bar"}
                                     #{"foo/foo-1/sub:read"})
               (catch Exception e
                 {:ex-msg (.getMessage e)
