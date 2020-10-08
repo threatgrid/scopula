@@ -1,7 +1,7 @@
 (ns scopula.core
-  "Handle scope logic
+  "Handles scopes logic.
 
-  scopes are case sensitive strings without any space that represent and
+  Scopes are case-sensitive strings without any whitespace, that represent
   authorization access. From OAuth2 RFC (https://tools.ietf.org/html/rfc6749#section-3.3):
 
   > The value of the scope parameter is expressed as a list of space-
@@ -13,37 +13,34 @@
   >   scope       = scope-token *( SP scope-token )
   >   scope-token = 1*( %x21 / %x23-5B / %x5D-7E )
 
-
-  In order to manage a fine grained authorizations this lib use a convention
+  In order to manage fine-grained authorizations, this lib uses a convention
   for scope formats.
-  For example, we often need to distinguish between a full scope that will provide
+  For example, we often need to distinguish between a full scope that will provides
   full access to some resource, and read-only access.
-  Sometime we also want to limit the access to some sub-resource.
-  Here are some example for our convention:
+  Sometimes we also want to limit the access to some sub-resource.
+  Here are some examples of our convention:
 
   `users`                      full access to users resource
   `users/profile`              access to users profile only
   `users/profile:read`         access to users profile read-only
   `users/profile/email:write`  access to users profile only email write-only
 
-
   Mainly `:` is only authorized to split between access read/write/rw
-  (nothing implies rw)
+  (nothing implies rw).
 
-  Sub resources are separated by `/` we can
+  Sub-resources can be separated by `/`.
 
-  This library provide helper functions to check that
+  This library provides helper functions to check that
+  a given scope will also grant e.g. `users/profile/email` and `users/profile:read`.
 
-  users scope will also grants `users/profile/email` and `users/profile:read`
-
-  We also provide helpers to normalize set of scopes:
+  We also provide helpers to normalize sets of scopes:
 
   >>> (normalize-scopes #{\"users\" \"users/profile/email:read\" \"admin\"})
   #{\"users\" \"admin\"}
 
-  as `users/profile/email:read` is redundant it was removed.
+  ...as `users/profile/email:read` is redundant, it is removed.
 
-  Note scopes are meant to be used in an OAuth2 access in mind and thus
+  Note that scopes are meant to be used in an OAuth2 access in mind, and thus
   are generally manipulated as a set of scopes.
 
   scopes that do not have any subpath are called _root scopes_.
@@ -52,13 +49,13 @@
   But it is generally impossible to remove just a sub-scope as it would
   mean we should know all the sub-paths of some root-scope and add the difference.
 
-  Scope are additive by their nature.
-  "
+  Scope are additive by nature."
   (:require [clojure
              [set :as set]
              [string :as string]]))
 
 (def allowed-chars-no-colon "[!#-9;-\\[\\]-~]")
+
 (def allowed-word (str allowed-chars-no-colon "+"))
 
 (def scope-regex (re-pattern (str
@@ -72,8 +69,8 @@
   (re-matches scope-regex scope))
 
 (defn to-scope-repr
-  "Transform a textual scope as an internal representation to help
-  check rules typically
+  "Transforms a textual scope as an internal representation to help
+  check rules, typically:
 
   > \"foo\"
   {:path [\"foo\"]
@@ -93,7 +90,7 @@
                #{})}))
 
 (defn scope-root
-  "display the root of a scope
+  "Displays the root of a scope.
 
   >>> (scope-root \"foo/bar:read\")
   foo
@@ -102,20 +99,19 @@
   (-> scope to-scope-repr :path first))
 
 (defn is-sub-list?
-  "check scope-path-list starts with req-list"
+  "Does `super-lst` begin with `lst`?"
   [lst super-lst]
   (let [n (count lst)]
     (= (take n super-lst) lst)))
 
 (defn repr-is-subscope?
-  "return true if the scope is a subscope of the super scope"
+  "Returns whether the `scope-to-check` is a subscope of the `super-scope`"
   [scope-to-check super-scope]
   (and (set/superset? (:access super-scope) (:access scope-to-check))
        (is-sub-list? (:path super-scope) (:path scope-to-check))))
 
-
 (defn is-subscope?
-  "return true if the scope-to-check is a subscope of the super-scope"
+  "Returns whether the `scope-to-check` is a subscope of the `super-scope`"
   [scope-to-check super-scope]
   (repr-is-subscope? (to-scope-repr scope-to-check)
                      (to-scope-repr super-scope)))
@@ -134,7 +130,7 @@
    :access (apply set/union (map :access reprs))})
 
 (defn repr-is-subsummed
-  "return true if scope is contained by all the scopes
+  "Return whether a scope is contained by all the scopes.
 
   Examples that return true:
 
@@ -158,11 +154,11 @@
                  (map merge-accesses)
                  set)]
     (->> ssr
-         (filter #(not (repr-is-subsummed % (disj ssr %))))
+         (remove #(repr-is-subsummed % (disj ssr %)))
          set)))
 
 (defn normalize-scopes
-  "Given a set of scope remove reduntant ones, and merge by access if possible"
+  "Given a set of scopes, remove reduntant ones, and merge them by access if possible."
   [scopes]
   (->> scopes
        (map to-scope-repr)
@@ -171,7 +167,7 @@
        set))
 
 (defn accepted-by-scopes
-  "scopes should be strings.
+  "`scopes` should be strings.
   if none of the string contains a `/` nor a `:`.
   It works as is a subset of.
 
@@ -187,15 +183,14 @@
   So the more precise rule of access is.
   All mandatory scopes must be sub-scopes of at least one user scopes.
 
-  Also mandatory the scopes and required should be normalized
-  "
+  Also mandatory the scopes and required should be normalized"
   [scopes required]
   (every? (fn [req-scope]
             (some #(repr-is-subscope? req-scope %) scopes))
           required))
 
 (defn access-granted
-  "check that the first parameter contains all the required scopes
+  "Checks that the first parameter contains all the required scopes
   given as second parameter."
   [scopes required]
   (accepted-by-scopes (repr-normalize-scopes (map to-scope-repr scopes))
@@ -207,22 +202,22 @@
   access-granted)
 
 (defn scopes-subset?
-  "flipped version of scopes-superset?.
+  "Flipped version of scopes-superset?.
   Returns true if the first set is a subset of the second set of scopes."
   [required scopes]
   (scopes-superset? scopes required))
 
 (defn repr-scopes-missing
-  "return the list of scopes-1 that is not in scopes-2"
+  "Return the list of `scopes-1` that is not in `scopes-2`"
   [scopes-1 scopes-2]
   (let [nsc-1 (repr-normalize-scopes scopes-1)
         nsc-2  (repr-normalize-scopes scopes-2)]
-    (filter (fn [scope]
-              (not (some #(repr-is-subscope? scope %) nsc-2)))
+    (remove (fn [scope]
+              (some #(repr-is-subscope? scope %) nsc-2))
             nsc-1)))
 
 (defn scopes-missing
-  "return element of the first set of scopes removing those in the second set
+  "Return the elements of the first set of scopes, removing those in the second set
   of scopes"
   [scopes-1 scopes-2]
   (->> (repr-scopes-missing (map to-scope-repr scopes-1)
@@ -231,11 +226,10 @@
        set))
 
 (defn root-scope
-  "display the root of a scope
+  "Returns the root of a scope.
 
   >>> (root-scope \"foo/bar:read\")
-  foo
-  "
+  foo"
   [scope]
   (-> scope to-scope-repr :path first))
 
@@ -244,23 +238,22 @@
   (= 1
      (count (-> scope to-scope-repr :path))))
 
-
 (defn add-scope
-  "Add the scope to a set of scopes"
+  "Add the scope to a set of scopes."
   [scope scopes]
   (normalize-scopes (cons scope scopes)))
 
 (def scope-cons add-scope)
 
 (defn scope-union
-  "Unionize two set of scopes"
+  "Unionize two set of scopes."
   [scopes-1 scopes-2]
   (normalize-scopes (set/union scopes-1 scopes-2)))
 
 ;; ## Removing scopes
 
 (defn repr-is-strict-subpath?
-  "return true if the first argument is strictly a sub path of the second argument"
+  "Return whether the first argument is strictly a sub-path of the second argument."
   [r1 r2]
   (let [n1 (count (:path r1))
         n2 (count (:path r2))]
@@ -270,9 +263,9 @@
 
 (defn repr-scope-remove
   "While inputs should be in repr form,
-
-  remove the single scope `rs-to-remove` from the single scope `rs`
-  returns `nil` if the two scopes do not intersect.
+  removes the single scope `rs-to-remove` from the single scope `rs`.
+  
+  Returns `nil` if the two scopes do not intersect.
 
   If the operation is not possible (for example, remove `foo/bar` from `foo`)
   this function throw an exception.
@@ -301,21 +294,21 @@
     rs))
 
 (defn raw-repr-scope-disj
-  "remove a scope from a set of scopes"
+  "Removes a scope from a set of scopes."
   [rscopes rs-to-remove]
   (set (keep #(repr-scope-remove % rs-to-remove) rscopes)))
 
 (defn repr-scope-disj
-  "remove a scope for a set of scopes.
+  "Remove a scope for a set of scopes.
   Will throw an exception if the scope to remove is a subscope of some scope in
-  the scopeset"
+  the scopes set."
   [repr-scopes rs-to-rm]
   (let [rr (repr-normalize-scopes repr-scopes)]
     (raw-repr-scope-disj rr rs-to-rm)))
 
 (defn scope-disj
-  "remove a scope from a set of scope. Throw an error if trying to remove a
-  subscope of an existing scope"
+  "Remove a scope from a set of scopes. Throw an error if trying to remove a
+  subscope of an existing scope."
   [scopes scope-to-remove]
   (let [rss (->> scopes (map to-scope-repr) set)
         rs-to-rm (to-scope-repr scope-to-remove)]
@@ -324,10 +317,9 @@
          set)))
 
 (defn scope-difference
-  "a lot similar to scopes-missing but take care of throwing an exception if
+  "Very similar to `scopes-missing`, but taking care of throwing an exception if
   some sub-scope cannot be removed. This would prevent an error when trying to
   reduce a set of scopes.
-
 
   (scope-difference #{\"foo/bar\"} #{\"foo:write\"})
   => #{\"foo/bar:read\"}
@@ -347,7 +339,7 @@
 ;; INTERSECTION
 
 (defn repr-scope-intersection
-  "return the maximal intersection between two sopes repr
+  "Returns the maximal intersection between two scopes reprs.
 
   `(to-scope-repr \"foo:write\")` and `(to-scope-repr \"foo/bar\")`
   => `(to-scope-repr \"foo/bar:write\")`
@@ -367,10 +359,9 @@
                    (:path r2))})))))
 
 (defn scope-intersection
-  "return the maximal intersection between two sopes
+  "Returns the maximal intersection between two scopes.
 
-  `foo:write` and `foo/bar` => `foo/bar:write`
-  "
+  `foo:write` and `foo/bar` => `foo/bar:write` "
   [scope-1 scope-2]
   (let [r1 (to-scope-repr scope-1)
         r2 (to-scope-repr scope-2)]
@@ -378,7 +369,7 @@
              scope-repr-to-str)))
 
 (defn repr-scopes-intersection
-  "return the intersection between two set of scope"
+  "Return the intersection between two set of scopes."
   [sr1 sr2]
   (->> (for [r1 sr1
              r2 sr2]
@@ -387,7 +378,7 @@
        (repr-normalize-scopes)))
 
 (defn scopes-intersection
-  "return the intersection between two set of scope"
+  "Return the intersection between two set of scopes."
   [scopes-1 scopes-2]
   (let [sr1 (-> (map to-scope-repr scopes-1) repr-normalize-scopes)
         sr2 (-> (map to-scope-repr scopes-2) repr-normalize-scopes)]
@@ -396,10 +387,10 @@
          set)))
 
 (defn repr-scopes-intersect?
-  "returns true if r1 and r2 intersect
+  "Returns whether r1 and r2 intersect.
 
   For example: `(to-scope-repr foo:write)` and `(to-scope-repr foo/bar)`
-  intersect while neither of those scope repr is a subscope of another."
+  intersect, while neither of those scopes reprs is a subscope of another."
   [r1 r2]
   (and (boolean (seq (set/intersection (:access r1) (:access r2))))
        (let [n (min (count (:path r1))
@@ -409,7 +400,7 @@
          (= sub-path-1 sub-path-2))))
 
 (defn scopes-intersect?
-  "returns true if scope-1 and scope-2 intersect
+  "Returns whether scope-1 and scope-2 intersect.
 
   For example: `foo:write` and `foo/bar` intersect while
   neither of those scope is a subscope of another."
@@ -419,8 +410,8 @@
     (repr-scopes-intersect? r1 r2)))
 
 (defn repr-scopes-intersecting
-  "Asymetrical operation; returns the list of first scopes repr that intersect
-  with some scopes repr of the second set of scopes repr"
+  "Asymmetrical operation; returns the list of first scopes repr that intersect
+  with some scopes repr of the second set of scopes repr."
   [rs-1 rs-2]
   (filter (fn [r-scope]
             (some #(repr-scopes-intersect? % r-scope) rs-2))
@@ -428,7 +419,7 @@
 
 (defn scopes-intersecting
   "Asymmetrical operation; returns the list of first scopes that intersect with
-  some scopes of the second set of scopes"
+  some scopes of the second set of scopes."
  [scopes-1 scopes-2]
   (let [rs-1 (map to-scope-repr scopes-1)
         rs-2 (map to-scope-repr scopes-2)]
