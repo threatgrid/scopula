@@ -313,10 +313,10 @@
                                   #{"foo/bar:write" "bar:write"}))))
 
 (deftest scopes-expand-test
-  (is (= #{"foo:write" "bar"}
+  (is (= #{"foo:write" "bar" "role+admin"}
          (sut/scopes-expand #{"role+admin"} {"role+admin" #{"foo:write" "bar"}})))
-  (is (= #{"foo:write" "bar" "baz"}
+  (is (= #{"foo:write" "bar" "baz" "role+admin"}
          (sut/scopes-expand #{"role+admin" "baz"} {"role+admin" #{"foo:write" "bar"}})))
-  (is (= #{"foo:write" "bar" "baz" "x" "y"}
+  (is (= #{"foo:write" "bar" "baz" "x" "y" "role+admin" "subrole+x"}
          (sut/scopes-expand #{"role+admin" "subrole+x" "baz"} {"role+admin" #{"foo:write" "bar"}
                                                                "subrole+x" #{"x" "y"}}))))

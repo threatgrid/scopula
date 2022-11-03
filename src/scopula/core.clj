@@ -433,4 +433,7 @@
   (set
    (apply concat
          (for [s scopes]
-           (get aliases s [s])))))
+           (if-let [subs (get aliases s)]
+             (conj subs s)
+             [s])
+           ))))
