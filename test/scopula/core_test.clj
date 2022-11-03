@@ -311,3 +311,12 @@
   (is (= #{}
          (sut/scopes-intersecting #{"foo:read" "bar:read"}
                                   #{"foo/bar:write" "bar:write"}))))
+
+(deftest scopes-expand-test
+  (is (= #{"foo:write" "bar"}
+         (sut/scopes-expand #{"role+admin"} {"role+admin" #{"foo:write" "bar"}})))
+  (is (= #{"foo:write" "bar" "baz"}
+         (sut/scopes-expand #{"role+admin" "baz"} {"role+admin" #{"foo:write" "bar"}})))
+  (is (= #{"foo:write" "bar" "baz" "x" "y"}
+         (sut/scopes-expand #{"role+admin" "subrole+x" "baz"} {"role+admin" #{"foo:write" "bar"}
+                                                               "subrole+x" #{"x" "y"}}))))

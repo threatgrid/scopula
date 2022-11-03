@@ -396,7 +396,24 @@ presenting messages to the customer.
                                 #{"foo" "bar:read"}))))
 #+end_src
 
+**** ~scopes-expand~
 
+The ~scopes-expand~ takes a set of scopes and a scope-aliases set and returned the
+expanded raw scopes.
+
+#+begin_src clojure
+(deftest scopes-expand-test
+  (is (= #{"foo:write" "bar"}
+         (sut/scopes-expand #{"role+admin"}
+                            {"role+admin" #{"foo:write" "bar"}})))
+  (is (= #{"foo:write" "bar" "baz"}
+         (sut/scopes-expand #{"role+admin" "baz"}
+                            {"role+admin" #{"foo:write" "bar"}})))
+  (is (= #{"foo:write" "bar" "baz" "x" "y"}
+         (sut/scopes-expand #{"role+admin" "subrole+x" "baz"}
+                            {"role+admin" #{"foo:write" "bar"}
+                             "subrole+x" #{"x" "y"}}))))
+#+end_src
 
 *** Notes
 

@@ -426,3 +426,11 @@
     (->> (repr-scopes-intersecting rs-1 rs-2)
          (map scope-repr-to-str)
          set)))
+
+(defn scopes-expand
+  "Given a list of scopes containing scope aliases expand them"
+  [scopes aliases]
+  (set
+   (apply concat
+         (for [s scopes]
+           (get aliases s [s])))))
