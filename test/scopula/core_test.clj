@@ -313,10 +313,21 @@
                                   #{"foo/bar:write" "bar:write"}))))
 
 (deftest scopes-expand-test
-  (is (= #{"foo:write" "bar" "role+admin"}
-         (sut/scopes-expand #{"role+admin"} {"role+admin" #{"foo:write" "bar"}})))
-  (is (= #{"foo:write" "bar" "baz" "role+admin"}
-         (sut/scopes-expand #{"role+admin" "baz"} {"role+admin" #{"foo:write" "bar"}})))
-  (is (= #{"foo:write" "bar" "baz" "x" "y" "role+admin" "subrole+x"}
-         (sut/scopes-expand #{"role+admin" "subrole+x" "baz"} {"role+admin" #{"foo:write" "bar"}
-                                                               "subrole+x" #{"x" "y"}}))))
+  (is (= #{"foo:write" "bar" "+admin"}
+         (sut/scopes-expand #{"+admin"} {"+admin" #{"foo:write" "bar"}})))
+  (is (= #{"foo:write" "bar" "baz" "+admin"}
+         (sut/scopes-expand #{"+admin" "baz"} {"+admin" #{"foo:write" "bar"}})))
+  (is (= #{"foo:write" "bar" "baz" "x" "y" "+admin" "+x"}
+         (sut/scopes-expand #{"+admin" "subrole+x" "baz"} {"+admin" #{"foo:write" "bar"}
+                                                           "+x"     #{"x" "y"}}))))
+
+(deftest scopes-compress-test
+  (is (= #{"+admin" "baz"}
+         (sut/scopes-compress #{"foo" "bar" "baz"}
+                              {"+admin" #{"foo" "bar"}
+                               "+foo" #{"foo"}}))
+      "This test check that the biggest matching alias is preferred to improve compression")
+  (is (= #{"+admin" "+baz" "x"}
+         (sut/scopes-compress #{"foo" "bar" "baz" "x"}
+                              {"+admin" #{"foo" "bar"}
+                               "+baz" #{"baz"}}))))

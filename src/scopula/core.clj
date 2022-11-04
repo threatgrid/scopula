@@ -428,12 +428,31 @@
          set)))
 
 (defn scopes-expand
-  "Given a list of scopes containing scope aliases expand them"
+  "Given a set of scopes containing scope aliases expand them"
   [scopes aliases]
   (set
    (apply concat
-         (for [s scopes]
-           (if-let [subs (get aliases s)]
-             (conj subs s)
-             [s])
-           ))))
+          (for [s scopes]
+            (if-let [subs (get aliases s)]
+              (conj subs s)
+              [s])))))
+
+(defn- scopes-compress-first
+  [scopes sorted-aliases]
+  (let [[alias-name scs] (first (filter (fn [[_ ss]] (scopes-subset? ss scopes)) sorted-aliases))]
+    (if alias-name
+      (try (-> (scope-difference scopes scs)
+               (conj alias-name))
+           (catch Exception _e
+             scopes))
+      scopes)))
+
+(defn scopes-compress
+  "Given a set of scopes and a dictionary of scopes aliases try its best to compress scopes with scope aliases
+  To have the best possible compression is an NP-complete problem, so we just use a quick heuristic."
+  [scopes aliases]
+  (let [sorted-aliases (sort-by (comp #(- %) count second) aliases)
+        compressed-scopes (scopes-compress-first scopes sorted-aliases)]
+    (if (= scopes compressed-scopes)
+      scopes
+      (scopes-compress compressed-scopes sorted-aliases))))
