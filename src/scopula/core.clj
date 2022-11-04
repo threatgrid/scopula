@@ -439,12 +439,14 @@
 
 (defn- scopes-compress-first
   [scopes sorted-aliases]
-  (let [[alias-name scs] (first (filter (fn [[_ ss]] (scopes-subset? ss scopes)) sorted-aliases))]
+  (let [[alias-name sd] (first (keep (fn [[alias-name ss]]
+                                        (when (scopes-subset? ss scopes)
+                                          (try [alias-name (scope-difference scopes ss)]
+                                               (catch Exception _ nil))))
+                                     sorted-aliases))]
     (if alias-name
-      (try (-> (scope-difference scopes scs)
-               (conj alias-name))
-           (catch Exception _e
-             scopes))
+      (-> sd
+          (conj alias-name))
       scopes)))
 
 (defn scopes-compress

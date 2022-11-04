@@ -330,4 +330,9 @@
   (is (= #{"+admin" "+baz" "x"}
          (sut/scopes-compress #{"foo" "bar" "baz" "x"}
                               {"+admin" #{"foo" "bar"}
-                               "+baz" #{"baz"}}))))
+                               "+baz" #{"baz"}})))
+
+  (is (= #{"+admin" "+baz" "baz:write" "x"}
+         (sut/scopes-compress #{"foo" "bar" "baz" "x"}
+                              {"+admin" #{"foo" "bar"}
+                               "+baz" #{"baz:read"}}))))
