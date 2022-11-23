@@ -64,9 +64,20 @@
                               "(:(read|write|rw))?$" ;; read write or rw
                               )))
 
+(def scope-alias-regex
+  (re-pattern (str
+               "^[+]" allowed-word ;; root-scope
+               "(/" allowed-word ")*" ;; path of sub-scopes
+               "(:(read|write|rw))?$" ;; read write or rw
+               )))
+
 (defn is-scope-format-valid?
   [scope]
   (re-matches scope-regex scope))
+
+(defn is-scope-alias?
+  [scope]
+  (re-matches scope-alias-regex scope))
 
 (defn to-scope-repr
   "Transforms a textual scope as an internal representation to help
@@ -430,12 +441,24 @@
 (defn scopes-expand
   "Given a set of scopes containing scope aliases expand them"
   [scopes aliases]
-  (set
-   (apply concat
-          (for [s scopes]
-            (if-let [subs (get aliases s)]
-              (conj subs s)
-              [s])))))
+  (->> (for [s scopes]
+         (if (is-scope-alias? s)
+           (or (get aliases s)
+               (throw (ex-info (format "missing scope alias (%s)" s)
+                               {:type ::scopes-expand-missing-alias
+                                :scope-alias-missing s})))
+           [s]))
+       (apply concat)
+       (set)))
+
+(defn safe-scopes-expand
+  "Same as scope expand but return nil instead of throwing and exception if a scope alias is missing"
+  [scopes aliases]
+  (try (scopes-expand scopes aliases)
+       (catch clojure.lang.ExceptionInfo e
+         (if (= ::scopes-expand-missing-alias (-> e ex-data :type))
+           nil
+           (throw e)))))
 
 (defn- scopes-compress-first
   [scopes sorted-aliases]
