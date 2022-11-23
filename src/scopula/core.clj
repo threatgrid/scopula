@@ -54,9 +54,9 @@
              [set :as set]
              [string :as string]]))
 
-(def allowed-chars-no-colon "[!#-9;-\\[\\]-~]")
+(def allowed-chars-no-colon-no-slash "[!#-.0-9;-\\[\\]-~]")
 
-(def allowed-word (str allowed-chars-no-colon "+"))
+(def allowed-word (str allowed-chars-no-colon-no-slash "+"))
 
 (def scope-regex (re-pattern (str
                               "^" allowed-word ;; root-scope
@@ -64,20 +64,9 @@
                               "(:(read|write|rw))?$" ;; read write or rw
                               )))
 
-(def scope-alias-regex
-  (re-pattern (str
-               "^[+]" allowed-word ;; root-scope
-               "(/" allowed-word ")*" ;; path of sub-scopes
-               "(:(read|write|rw))?$" ;; read write or rw
-               )))
-
 (defn is-scope-format-valid?
   [scope]
   (re-matches scope-regex scope))
-
-(defn is-scope-alias?
-  [scope]
-  (re-matches scope-alias-regex scope))
 
 (defn to-scope-repr
   "Transforms a textual scope as an internal representation to help
@@ -438,8 +427,27 @@
          (map scope-repr-to-str)
          set)))
 
+;; ## Scope aliases
+
+(def scope-alias-regex
+  (re-pattern (str "^[+]" allowed-word)))
+
+(defn is-scope-alias?
+  [scope]
+  (re-matches scope-alias-regex scope))
+
+
+(defn is-scope-aliases-map?
+  [aliases]
+  (every? is-scope-alias? (keys aliases)))
+
 (defn scopes-expand
-  "Given a set of scopes containing scope aliases expand them"
+  "Given a set of scopes containing scope aliases expand them.
+
+  Scopes aliases will be replaced, so the output of scopes-expand should not contain
+  any scope alias.
+
+  If some scope alias is missing in the scope-aliases-map, scope expand will throw an exception."
   [scopes aliases]
   (->> (for [s scopes]
          (if (is-scope-alias? s)

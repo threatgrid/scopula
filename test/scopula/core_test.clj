@@ -314,7 +314,10 @@
 
 (deftest is-scopes-alias?
   (is (sut/is-scope-alias? "+foo"))
-  (is (not (sut/is-scope-alias? "foo"))))
+  (is (not (sut/is-scope-alias? "foo")))
+  (is (not (sut/is-scope-alias? "+foo/bar")))
+  (is (not (sut/is-scope-alias? "+foo:read")))
+  (is (not (sut/is-scope-alias? "+foo/bar:read"))))
 
 (deftest scopes-expand-test
   (is (= #{"foo:write" "bar"}
