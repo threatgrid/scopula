@@ -398,7 +398,7 @@ presenting messages to the customer.
 
 **** ~scopes-expand~
 
-The ~scopes-expand~ takes a set of scopes and a scope-aliases set and returned the
+The ~scopes-expand~ takes a set of scopes and a scope-aliases set and returns the
 expanded raw scopes.
 
 #+begin_src clojure
