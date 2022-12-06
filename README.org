@@ -396,7 +396,81 @@ presenting messages to the customer.
                                 #{"foo" "bar:read"}))))
 #+end_src
 
+**** ~scopes-expand~
 
+The ~scopes-expand~ takes a set of scopes and a scope-aliases set and returns the
+expanded raw scopes.
+
+#+begin_src clojure
+(deftest scopes-expand-test
+  (is (= #{"foo:write" "bar"}
+         (sut/scopes-expand #{"+admin"} {"+admin" #{"foo:write" "bar"}})))
+  (is (= #{"foo:write" "bar" "baz"}
+         (sut/scopes-expand #{"+admin" "baz"} {"+admin" #{"foo:write" "bar"}})))
+  (is (= #{"foo:write" "bar" "baz" "subrole+x"}
+         (sut/scopes-expand #{"+admin" "subrole+x" "baz"} {"+admin" #{"foo:write" "bar"}
+                                                           "+x"     #{"x" "y"}})))
+  (is (= #{"admin"}
+         (sut/scopes-expand #{"admin"} {"admin" #{"foo"}}))
+      "scope expansion should only be performed on scope aliases starting with +")
+
+  (testing "missing scope alias"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (sut/scopes-expand #{"+admin"} {})))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (sut/scopes-expand #{"+admin"} {"admin" #{"foo"}})))))
+#+end_src
+
+**** ~scopes-length~
+
+This functions takes a set of scopes as input and return the sum of the lengths
+of all scopes it contains.
+
+#+begin_src clojure
+(deftest scopes-length-test
+  (is (= 0 (sut/scopes-length #{})))
+  (is (= 3 (sut/scopes-length #{"foo"})))
+  (is (= 9 (sut/scopes-length #{"foo" "bar" "baz"})))
+  (is (= 22 (sut/scopes-length #{"foo/bar/baz" "foo" "foo:read"})))
+  (is (= 11 (sut/scopes-length #{"foo-bar-baz"}))))
+#+end_src
+
+**** ~scopes-compress~
+
+A function using a fast heuristic to try to use scopes aliases to reduce the
+size of a set of scopes.
+It is more important to have a fast non optimal result than to lose time trying
+to achieve optimal compression as this appear to be an NP-complete problem.
+
+This function is intended to be used in places where we don't care too much
+about reaching optimal compression but just doing a best effort in finding a
+shorter scopes set description that could easily be expanded to the full set of scopes.
+
+#+begin_src clojure
+(deftest scopes-compress-test
+  (is (= #{"+admin" "baz"}
+         (sut/scopes-compress #{"foo" "bar" "baz"}
+                              {"+admin" #{"foo" "bar"}
+                               "+foo" #{"foo"}}))
+      "This test check that the biggest matching alias is preferred to improve compression")
+  (is (= #{"+admin" "+baz" "x"}
+         (sut/scopes-compress #{"foo" "bar" "baz" "x"}
+                              {"+admin" #{"foo" "bar"}
+                               "+baz" #{"baz"}})))
+
+  (is (= #{"+admin" "+baz" "baz:write" "x"}
+         (sut/scopes-compress #{"foo" "bar" "baz" "x"}
+                              {"+admin" #{"foo" "bar"}
+                               "+baz" #{"baz:read"}})))
+  (is (= #{"foo" "bar" "baz" "+admin"}
+         (sut/scopes-compress #{"foo" "bar" "baz" "x" "very-very-long-scope-name"}
+                              {"+admin" #{"x" "very-very-long-scope-name"}
+                               "+baz" #{"foo" "bar" "x"}}))
+      (str "Example of potentially missing an opportunity to compress,"
+           " but show that the length of the string of scopes is more important"
+           " than the number of scopes."
+           " This is still a pretty good-enough for most intended use cases.")))
+#+end_src
 
 *** Notes
 

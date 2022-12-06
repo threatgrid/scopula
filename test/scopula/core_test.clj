@@ -311,3 +311,75 @@
   (is (= #{}
          (sut/scopes-intersecting #{"foo:read" "bar:read"}
                                   #{"foo/bar:write" "bar:write"}))))
+
+(deftest is-scopes-alias?
+  (is (sut/is-scope-alias? "+foo"))
+  (is (not (sut/is-scope-alias? "foo")))
+  (is (not (sut/is-scope-alias? "+foo/bar")))
+  (is (not (sut/is-scope-alias? "+foo:read")))
+  (is (not (sut/is-scope-alias? "+foo/bar:read"))))
+
+(deftest scopes-expand-test
+  (is (= #{"foo:write" "bar"}
+         (sut/scopes-expand #{"+admin"} {"+admin" #{"foo:write" "bar"}})))
+  (is (= #{"foo:write" "bar" "baz"}
+         (sut/scopes-expand #{"+admin" "baz"} {"+admin" #{"foo:write" "bar"}})))
+  (is (= #{"foo:write" "bar" "baz" "subrole+x"}
+         (sut/scopes-expand #{"+admin" "subrole+x" "baz"} {"+admin" #{"foo:write" "bar"}
+                                                           "+x"     #{"x" "y"}})))
+  (is (= #{"admin"}
+         (sut/scopes-expand #{"admin"} {"admin" #{"foo"}}))
+      "scope expansion should only be performed on scope aliases starting with +")
+
+  (testing "missing scope alias"
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (sut/scopes-expand #{"+admin"} {})))
+    (is (thrown? clojure.lang.ExceptionInfo
+                 (sut/scopes-expand #{"+admin"} {"admin" #{"foo"}})))))
+
+(deftest safe-scopes-expand-test
+  (is (= #{"foo:write" "bar"}
+         (sut/safe-scopes-expand #{"+admin"} {"+admin" #{"foo:write" "bar"}})))
+  (is (= #{"foo:write" "bar" "baz"}
+         (sut/safe-scopes-expand #{"+admin" "baz"} {"+admin" #{"foo:write" "bar"}})))
+  (is (= #{"foo:write" "bar" "baz" "subrole+x"}
+         (sut/safe-scopes-expand #{"+admin" "subrole+x" "baz"} {"+admin" #{"foo:write" "bar"}
+                                                           "+x"     #{"x" "y"}})))
+  (is (= #{"admin"}
+         (sut/safe-scopes-expand #{"admin"} {"admin" #{"foo"}}))
+      "scope expansion should only be performed on scope aliases starting with +")
+
+  (testing "missing scope alias"
+    (is (nil?(sut/safe-scopes-expand #{"+admin"} {})))
+    (is (nil? (sut/safe-scopes-expand #{"+admin"} {"admin" #{"foo"}})))))
+
+(deftest scopes-length-test
+  (is (= 0 (sut/scopes-length #{})))
+  (is (= 3 (sut/scopes-length #{"foo"})))
+  (is (= 9 (sut/scopes-length #{"foo" "bar" "baz"})))
+  (is (= 22 (sut/scopes-length #{"foo/bar/baz" "foo" "foo:read"})))
+  (is (= 11 (sut/scopes-length #{"foo-bar-baz"}))))
+
+(deftest scopes-compress-test
+  (is (= #{"+admin" "baz"}
+         (sut/scopes-compress #{"foo" "bar" "baz"}
+                              {"+admin" #{"foo" "bar"}
+                               "+foo" #{"foo"}}))
+      "This test check that the biggest matching alias is preferred to improve compression")
+  (is (= #{"+admin" "+baz" "x"}
+         (sut/scopes-compress #{"foo" "bar" "baz" "x"}
+                              {"+admin" #{"foo" "bar"}
+                               "+baz" #{"baz"}})))
+
+  (is (= #{"+admin" "+baz" "baz:write" "x"}
+         (sut/scopes-compress #{"foo" "bar" "baz" "x"}
+                              {"+admin" #{"foo" "bar"}
+                               "+baz" #{"baz:read"}})))
+  (is (= #{"foo" "bar" "baz" "+admin"}
+         (sut/scopes-compress #{"foo" "bar" "baz" "x" "very-very-long-scope-name"}
+                              {"+admin" #{"x" "very-very-long-scope-name"}
+                               "+baz" #{"foo" "bar" "x"}}))
+      (str "Example of potentially missing an opportunity to compress,"
+           " but show that the length of the string of scopes is more important"
+           " than the number of scopes."
+           " This is still a pretty good-enough for most intended use cases.")))

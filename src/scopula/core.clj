@@ -50,13 +50,13 @@
   mean we should know all the sub-paths of some root-scope and add the difference.
 
   Scope are additive by nature."
-  (:require [clojure
-             [set :as set]
-             [string :as string]]))
+  (:require
+   [clojure.set :as set]
+   [clojure.string :as string]))
 
-(def allowed-chars-no-colon "[!#-9;-\\[\\]-~]")
+(def allowed-chars-no-colon-no-slash "[!#-.0-9;-\\[\\]-~]")
 
-(def allowed-word (str allowed-chars-no-colon "+"))
+(def allowed-word (str allowed-chars-no-colon-no-slash "+"))
 
 (def scope-regex (re-pattern (str
                               "^" allowed-word ;; root-scope
@@ -426,3 +426,86 @@
     (->> (repr-scopes-intersecting rs-1 rs-2)
          (map scope-repr-to-str)
          set)))
+
+;; ## Scope aliases
+
+(def scope-alias-regex
+  (re-pattern (str "^[+]" allowed-word)))
+
+(defn is-scope-alias?
+  [scope]
+  (re-matches scope-alias-regex scope))
+
+
+(defn is-scope-aliases-map?
+  [aliases]
+  (every? is-scope-alias? (keys aliases)))
+
+(defn scopes-expand
+  "Given a set of scopes containing scope aliases expand them.
+
+  Scopes aliases will be replaced, so the output of scopes-expand should not contain
+  any scope alias.
+
+  If some scope alias is missing in the scope-aliases-map, scope expand will throw an exception."
+  [scopes aliases]
+  (->> (for [s scopes]
+         (if (is-scope-alias? s)
+           (or (get aliases s)
+               (throw (ex-info (format "missing scope alias (%s)" s)
+                               {:type ::scopes-expand-missing-alias
+                                :scope-alias-missing s})))
+           [s]))
+       (apply concat)
+       (set)))
+
+(defn safe-scopes-expand
+  "Same as scope expand but return nil instead of throwing and exception if a scope alias is missing"
+  [scopes aliases]
+  (try (scopes-expand scopes aliases)
+       (catch clojure.lang.ExceptionInfo e
+         (if (= ::scopes-expand-missing-alias (-> e ex-data :type))
+           nil
+           (throw e)))))
+
+(defn- scopes-compress-first
+  [scopes sorted-aliases]
+  (let [[alias-name sd] (first (keep (fn [[alias-name ss]]
+                                        (when (scopes-subset? ss scopes)
+                                          (try [alias-name (scope-difference scopes ss)]
+                                               (catch Exception _ nil))))
+                                     sorted-aliases))]
+    (if alias-name
+      (conj sd alias-name)
+      scopes)))
+
+(defn scopes-length
+  "Return the sum of the length of string in a set of scopes."
+  [scopes]
+  (reduce + (mapv count scopes)))
+
+(defn scopes-compress
+  "Given a set of scopes and a dictionary of scopes aliases
+  use a fast heuristic to compress scopes with scope aliases.
+
+  It is more important to have a fast function than an efficient one.
+  The best possible compression is clearly an NP-complete problem.
+
+  What we do, we first sort aliases by the size of string that would be generated to list all the scopes.
+  So for example:
+
+  ```
+  {\"+foo\" {\"x\" \"y\"}
+  \"+bar\" {\"very-long-name-for-a-scope\"}
+  }
+  ```
+
+  the scope alias +bar will be preferred as even if the set contain fewer elements, the sum of the length
+  of the scopes in the scopes set is longer.
+  "
+  [scopes aliases]
+  (let [sorted-aliases (sort-by (comp #(- %) scopes-length second) aliases)
+        compressed-scopes (scopes-compress-first scopes sorted-aliases)]
+    (if (= scopes compressed-scopes)
+      scopes
+      (scopes-compress compressed-scopes sorted-aliases))))
