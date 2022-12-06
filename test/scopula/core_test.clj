@@ -355,6 +355,7 @@
 
 (deftest scopes-length-test
   (is (= 0 (sut/scopes-length #{})))
+  (is (= 3 (sut/scopes-length #{"foo"})))
   (is (= 9 (sut/scopes-length #{"foo" "bar" "baz"})))
   (is (= 22 (sut/scopes-length #{"foo/bar/baz" "foo" "foo:read"})))
   (is (= 11 (sut/scopes-length #{"foo-bar-baz"}))))

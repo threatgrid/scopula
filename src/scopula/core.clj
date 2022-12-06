@@ -50,9 +50,9 @@
   mean we should know all the sub-paths of some root-scope and add the difference.
 
   Scope are additive by nature."
-  (:require [clojure
-             [set :as set]
-             [string :as string]]))
+  (:require
+   [clojure.set :as set]
+   [clojure.string :as string]))
 
 (def allowed-chars-no-colon-no-slash "[!#-.0-9;-\\[\\]-~]")
 
@@ -476,8 +476,7 @@
                                                (catch Exception _ nil))))
                                      sorted-aliases))]
     (if alias-name
-      (-> sd
-          (conj alias-name))
+      (conj sd alias-name)
       scopes)))
 
 (defn scopes-length
