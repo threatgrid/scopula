@@ -480,11 +480,32 @@
           (conj alias-name))
       scopes)))
 
+(defn scopes-length
+  "Return the sum of the length of string in a set of scopes."
+  [scopes]
+  (reduce + (mapv count scopes)))
+
 (defn scopes-compress
-  "Given a set of scopes and a dictionary of scopes aliases try its best to compress scopes with scope aliases
-  To have the best possible compression is an NP-complete problem, so we just use a quick heuristic."
+  "Given a set of scopes and a dictionary of scopes aliases
+  use a fast heuristic to compress scopes with scope aliases.
+
+  It is more important to have a fast function than an efficient one.
+  The best possible compression is clearly an NP-complete problem.
+
+  What we do, we first sort aliases by the size of string that would be generated to list all the scopes.
+  So for example:
+
+  ```
+  {\"+foo\" {\"x\" \"y\"}
+  \"+bar\" {\"very-long-name-for-a-scope\"}
+  }
+  ```
+
+  the scope alias +bar will be preferred as even if the set contain fewer elements, the sum of the length
+  of the scopes in the scopes set is longer.
+  "
   [scopes aliases]
-  (let [sorted-aliases (sort-by (comp #(- %) count second) aliases)
+  (let [sorted-aliases (sort-by (comp #(- %) scopes-length second) aliases)
         compressed-scopes (scopes-compress-first scopes sorted-aliases)]
     (if (= scopes compressed-scopes)
       scopes

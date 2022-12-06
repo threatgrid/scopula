@@ -353,6 +353,12 @@
     (is (nil?(sut/safe-scopes-expand #{"+admin"} {})))
     (is (nil? (sut/safe-scopes-expand #{"+admin"} {"admin" #{"foo"}})))))
 
+(deftest scopes-length-test
+  (is (= 0 (sut/scopes-length #{})))
+  (is (= 9 (sut/scopes-length #{"foo" "bar" "baz"})))
+  (is (= 22 (sut/scopes-length #{"foo/bar/baz" "foo" "foo:read"})))
+  (is (= 11 (sut/scopes-length #{"foo-bar-baz"}))))
+
 (deftest scopes-compress-test
   (is (= #{"+admin" "baz"}
          (sut/scopes-compress #{"foo" "bar" "baz"}
@@ -367,4 +373,12 @@
   (is (= #{"+admin" "+baz" "baz:write" "x"}
          (sut/scopes-compress #{"foo" "bar" "baz" "x"}
                               {"+admin" #{"foo" "bar"}
-                               "+baz" #{"baz:read"}}))))
+                               "+baz" #{"baz:read"}})))
+  (is (= #{"foo" "bar" "baz" "+admin"}
+         (sut/scopes-compress #{"foo" "bar" "baz" "x" "very-very-long-scope-name"}
+                              {"+admin" #{"x" "very-very-long-scope-name"}
+                               "+baz" #{"foo" "bar" "x"}}))
+      (str "Example of potentially missing an opportunity to compress,"
+           " but show that the length of the string of scopes is more important"
+           " than the number of scopes."
+           " This is still a pretty good-enough for most intended use cases.")))
