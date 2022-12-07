@@ -55,18 +55,21 @@
    [clojure.string :as string]))
 
 (def allowed-chars-no-colon-no-slash "[!#-.0-9;-\\[\\]-~]")
+(def allowed-chars-no-colon-no-slash-no-plus "[!#-*,-.0-9;-\\[\\]-~]")
 
+(def allowed-root (str allowed-chars-no-colon-no-slash-no-plus
+                       allowed-chars-no-colon-no-slash "*"))
 (def allowed-word (str allowed-chars-no-colon-no-slash "+"))
 
 (def scope-regex (re-pattern (str
-                              "^" allowed-word ;; root-scope
+                              "^" allowed-root ;; root-scope
                               "(/" allowed-word ")*" ;; path of sub-scopes
                               "(:(read|write|rw))?$" ;; read write or rw
                               )))
 
 (defn is-scope-format-valid?
   [scope]
-  (re-matches scope-regex scope))
+  (boolean (re-matches scope-regex scope)))
 
 (defn to-scope-repr
   "Transforms a textual scope as an internal representation to help
@@ -434,7 +437,7 @@
 
 (defn is-scope-alias?
   [scope]
-  (re-matches scope-alias-regex scope))
+  (boolean (re-matches scope-alias-regex scope)))
 
 
 (defn is-scope-aliases-map?
