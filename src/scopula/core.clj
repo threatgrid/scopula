@@ -471,7 +471,8 @@
 (defn- scopes-compress-first
   [scopes sorted-aliases]
   (let [[alias-name sd] (first (keep (fn [[alias-name ss]]
-                                        (when (scopes-subset? ss scopes)
+                                        (when (and (scopes-subset? ss scopes)
+                                                   (seq ss))
                                           (try [alias-name (scope-difference scopes ss)]
                                                (catch Exception _ nil))))
                                      sorted-aliases))]

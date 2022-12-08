@@ -370,6 +370,12 @@
          (sut/scopes-compress #{"foo" "bar" "baz" "x"}
                               {"+admin" #{"foo" "bar"}
                                "+baz" #{"baz"}})))
+  (is (= #{"+admin" "+baz" "x"}
+         (sut/scopes-compress #{"foo" "bar" "baz" "x"}
+                              {"+admin" #{"foo" "bar"}
+                               "+baz" #{"baz"}
+                               "+foo" #{}}))
+      "Make sure if the alias dictionary have an empty entry, the alias-name will not be included in the compressed-scopes")
 
   (is (= #{"+admin" "+baz" "baz:write" "x"}
          (sut/scopes-compress #{"foo" "bar" "baz" "x"}
