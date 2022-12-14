@@ -7,6 +7,10 @@
 (s/def :scopula/scope
   (s/and string? scopula/is-scope-format-valid?))
 
+
+(s/def :scopula/root-scope
+  (s/and string? scopula/is-scope-repr-path-valid?))
+
 (s/def :scopula/path
   (s/and
    (s/coll-of string? :kind vector?)
@@ -37,6 +41,10 @@
 (s/fdef scopula/to-scope-repr
   :args (s/cat :scope :scopula/scope)
   :ret :scopula/scope-repr)
+
+(s/fdef scopula/scope-root
+  :args (s/cat :scope :scopula/scope)
+  :ret :scopula/root-scope)
 
 ;; validate all fn specs!
 (defn enable-scopula-spec-validation!
