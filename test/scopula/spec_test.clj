@@ -1,7 +1,9 @@
 (ns scopula.spec-test
   (:require [clojure.test :refer [deftest are is testing]]
             [clojure.spec.alpha :as s]
-            [scopula.spec :as sut]))
+            [clojure.spec.test.alpha :as stest]
+            [scopula.spec :as sut]
+            [scopula.core :as core]))
 
 (deftest scope-test
   (let [positives
@@ -76,3 +78,43 @@
          ]]
     (doseq [[x err] negatives]
       (is (not (s/valid? :scopula/scopes x)) err))))
+
+(deftest aliases-dictionary-test
+  (let [positives
+        [[{} "empty case"]
+         [{"+admin" #{"admin" "user"}} "normal use case with a single scope alias dictionary"]
+         [{"+admin" #{"admin" "user"}
+           "+user" #{"user:read"}}
+          "two aliases"]]]
+    (doseq [[x err] positives]
+      (is (s/valid? :scopula/aliases-dictionary x) err)))
+  (let [negatives
+        [[{"+admin" #{} "+user" #{"user:read"}} "empty set of aliases"]
+         [{"admin" #{"admin" "user"}} "not using an alias name as key"]
+         [{"+admin" #{"admin" "+user"} "+user" #{"user:read"}} "contain another alias"]
+         [{"+admin" #{"+admin" "user"} "+user" #{"user:read"}} "contain itself recursively"]]]
+    (doseq [[x err] negatives]
+      (is (not (s/valid? :scopula/aliases-dictionary x)) err))))
+
+(defmacro fail-spec?
+  [x & body]
+  `
+  (let [x# ~x]
+    (try
+      (do ~@body)
+      (is false (str "case " x# " did not break spec"))
+      (catch Exception e#
+        (is (= :instrument
+               (-> e# ex-data :clojure.spec.alpha/failure))
+            (str "case " x# " thrown an exception but did not break spec."))))))
+
+(deftest is-scope-format-valid-spec-test
+  (stest/instrument `core/is-scope-format-valid?)
+  (let [negatives
+        [nil
+         42
+         :k
+         [\f \o \o]
+         'x]]
+    (doseq [x negatives]
+      (fail-spec? x (core/is-scope-format-valid? x)))))

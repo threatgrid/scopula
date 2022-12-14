@@ -11,3 +11,10 @@
 (s/def :scopula/scopes
   (s/coll-of #(s/valid? :scopula/scope %)
              :kind set?))
+
+(s/def :scopula/aliases-dictionary
+  (s/map-of :scopula/alias (s/and seq :scopula/scopes)))
+
+(s/fdef scopula/is-scope-format-valid?
+  :args (s/cat :scope string?)
+  :ret boolean?)
