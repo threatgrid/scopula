@@ -453,22 +453,17 @@
   [scope]
   (boolean (re-matches scope-alias-regex scope)))
 
-
-(defn is-scope-aliases-map?
-  [aliases]
-  (every? is-scope-alias? (keys aliases)))
-
 (defn scopes-expand
   "Given a set of scopes containing scope aliases expand them.
 
   Scopes aliases will be replaced, so the output of scopes-expand should not contain
   any scope alias.
 
-  If some scope alias is missing in the scope-aliases-map, scope expand will throw an exception."
-  [scopes aliases]
+  If some scope alias is missing in the scope-aliases-dict, scope expand will throw an exception."
+  [scopes aliases-dict]
   (->> (for [s scopes]
          (if (is-scope-alias? s)
-           (or (get aliases s)
+           (or (get aliases-dict s)
                (throw (ex-info (format "missing scope alias (%s)" s)
                                {:type ::scopes-expand-missing-alias
                                 :scope-alias-missing s})))
@@ -478,8 +473,8 @@
 
 (defn safe-scopes-expand
   "Same as scope expand but return nil instead of throwing and exception if a scope alias is missing"
-  [scopes aliases]
-  (try (scopes-expand scopes aliases)
+  [scopes aliases-dict]
+  (try (scopes-expand scopes aliases-dict)
        (catch clojure.lang.ExceptionInfo e
          (if (= ::scopes-expand-missing-alias (-> e ex-data :type))
            nil
@@ -520,8 +515,8 @@
   the scope alias +bar will be preferred as even if the set contain fewer elements, the sum of the length
   of the scopes in the scopes set is longer.
   "
-  [scopes aliases]
-  (let [sorted-aliases (sort-by (comp #(- %) scopes-length second) aliases)
+  [scopes aliases-dict]
+  (let [sorted-aliases (sort-by (comp #(- %) scopes-length second) aliases-dict)
         compressed-scopes (scopes-compress-first scopes sorted-aliases)]
     (if (= scopes compressed-scopes)
       scopes

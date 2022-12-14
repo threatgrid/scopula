@@ -3,8 +3,7 @@
             [clojure.spec.alpha :as s]
             [clojure.spec.test.alpha :as stest]
             [scopula.spec :as sut]
-            [scopula.core :as core]
-            [scopula.core :as scopula]))
+            [scopula.core :as core]))
 
 (defn instrument-all-fns [f]
   (do
@@ -164,6 +163,18 @@
          'x]]
     (doseq [x negatives]
       (fail-spec? x (core/to-scope-repr x)))))
+
+(deftest scopes-expand-spec-test
+  (let [dict {"+admin" #{"admin" "user"}
+              "+user" #{"user:read"}}
+        negatives
+        [["admin"]
+         #{"admin"}
+         #{"+admin"}
+         ]]
+    (doseq [x negatives]
+      (fail-spec? x (core/scopes-expand x dict))))
+  )
 
 (deftest generative-testing
   (let [{:keys [total check-passed]}

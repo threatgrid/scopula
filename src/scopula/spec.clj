@@ -30,6 +30,13 @@
   (s/coll-of #(s/valid? :scopula/scope %)
              :kind set?))
 
+(s/def :scopula/scope-or-alias
+  (s/or :scopula/scope :scopula/alias))
+
+(s/def :scopula/extended-scopes
+  (s/coll-of :scopula/scope-or-alias
+             :kind set?))
+
 (s/def :scopula/aliases-dictionary
   (s/map-of :scopula/alias (s/and seq :scopula/scopes)))
 
@@ -45,6 +52,11 @@
 (s/fdef scopula/scope-root
   :args (s/cat :scope :scopula/scope)
   :ret :scopula/root-scope)
+
+(s/fdef scopula/scopes-expand
+  :args (s/cat :scopes :scopula/extended-scopes
+               :aliases-dict :scopula/aliases-dictionary)
+  :ret :scopula/scopes)
 
 ;; validate all fn specs!
 (defn enable-scopula-spec-validation!
