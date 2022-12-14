@@ -7,4 +7,5 @@
   :dependencies [[org.clojure/clojure "1.11.1"]]
   :deploy-repositories [["releases"  {:url "https://clojars.org/repo" :creds :gpg}]
                         ["snapshots" {:url "https://clojars.org/repo" :creds :gpg}]]
-  :repl-options {:init-ns scopula.core})
+  :repl-options {:init-ns scopula.core}
+  :profiles {:dev {:dependencies [[org.clojure/test.check "0.9.0"]]}})

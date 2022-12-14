@@ -1,9 +1,17 @@
 (ns scopula.spec-test
-  (:require [clojure.test :refer [deftest are is testing]]
+  (:require [clojure.test :refer [deftest are is testing use-fixtures]]
             [clojure.spec.alpha :as s]
             [clojure.spec.test.alpha :as stest]
             [scopula.spec :as sut]
-            [scopula.core :as core]))
+            [scopula.core :as core]
+            [scopula.core :as scopula]))
+
+(defn instrument-all-fns [f]
+  (do
+    (sut/enable-scopula-spec-validation!)
+    (f)))
+
+(use-fixtures :once instrument-all-fns)
 
 (deftest scope-test
   (let [positives
@@ -32,6 +40,35 @@
          ["https://hsome.dns/sub/url" "The : in the url si not supported"]]]
     (doseq [[x err] negatives]
       (is (not (s/valid? :scopula/scope x)) err))))
+
+(deftest scope-repr-test
+  (let [positives
+        [[{:path ["root" "sub1" "sub2"]
+           :access #{:read :write}}
+          "normal case"]
+         [{:path ["root" "sub1" "sub2"]
+           :access #{}}
+          "empty access"]
+         [{:path ["root" "+sub1" "sub2"]
+           :access #{}}
+          "sub scope string starts with a +"]]]
+    (doseq [[x err] positives]
+      (is (s/valid? :scopula/scope-repr x) err)))
+  (let [negatives
+        [[{:path ["root" "sub1" "sub2"]
+           :access #{:read :w}}
+          "wrong access value"]
+         [{:path ["+root"]
+           :access #{:read}}
+          "+root element in path"]
+         [{:path ["root/sub"]
+           :access #{:read}}
+          "root/sub element in path"]
+         [{:path []
+           :access #{:read}}
+          "empty path"]]]
+    (doseq [[x err] negatives]
+      (is (not (s/valid? :scopula/scope-repr x)) err))))
 
 (deftest alias-test
   (let [positives
@@ -109,7 +146,6 @@
             (str "case " x# " thrown an exception but did not break spec."))))))
 
 (deftest is-scope-format-valid-spec-test
-  (stest/instrument `core/is-scope-format-valid?)
   (let [negatives
         [nil
          42
@@ -118,3 +154,20 @@
          'x]]
     (doseq [x negatives]
       (fail-spec? x (core/is-scope-format-valid? x)))))
+
+(deftest to-scope-repr-spec-test
+  (let [negatives
+        [nil
+         42
+         :k
+         [\f \o \o]
+         'x]]
+    (doseq [x negatives]
+      (fail-spec? x (core/to-scope-repr x)))))
+
+(deftest generative-testing
+  (let [{:keys [total check-passed]}
+        (-> (stest/enumerate-namespace 'scopula.core)
+            (stest/check)
+            (stest/summarize-results))]
+    (is (= total check-passed) "Generative tests checked on all scopula.core functions")))

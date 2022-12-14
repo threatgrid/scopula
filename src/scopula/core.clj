@@ -67,6 +67,20 @@
                               "(:(read|write|rw))?$" ;; read write or rw
                               )))
 
+(def scope-repr-path-regex
+  (re-pattern (str "^" allowed-root "$")))
+
+(defn is-scope-repr-path-valid?
+  [path-part]
+  (boolean (re-matches scope-repr-path-regex path-part)))
+
+(def scope-repr-subpath-regex
+  (re-pattern (str "^" allowed-word "$")))
+
+(defn is-scope-repr-subpath-valid?
+  [path-part]
+  (boolean (re-matches scope-repr-subpath-regex path-part)))
+
 (defn is-scope-format-valid?
   [scope]
   (boolean (re-matches scope-regex scope)))
