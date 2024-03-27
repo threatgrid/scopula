@@ -45,11 +45,15 @@ Here are some example for our convention:
 | =users/profile:read=        | access to users profile read-only             |
 | =users/profile/email:write= | access to users profile only email write-only |
 
+The generic format is a string with an optional single column ~:~.
+Before the ~:~ this represent a Resource Path.
+And after the ~:~ this represent a type of access, typically, ~read~, ~write~ or ~rw~.
 
-Mainly =:= is only authorized to split between access =read=/=write=/=rw=
-(nothing implies rw)
+If no ~:~ is present we consider the access to be ~rw~.
 
-Sub resources are separated by =/= we can
+So  ~RESOURCE_PATH:ACCESS~ where ~ACCESS~ could be ~r~, ~w~, ~read~, ~write~ or ~rw~.
+And where `RESOURCE_PATH` is a string that could contain multiple ~/~ to represent
+sub scopes.
 
 This library provide helper functions to check that users scope will also grants
 =users/profile/email= and =users/profile:read=
