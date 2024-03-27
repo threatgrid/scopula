@@ -61,7 +61,7 @@
 (def scope-regex (re-pattern (str
                               "^" allowed-word ;; root-scope
                               "(/" allowed-word ")*" ;; path of sub-scopes
-                              "(:(read|write|rw))?$" ;; read write or rw
+                              "(:(r|read|w|write|rw))?$" ;; read write or rw
                               )))
 
 (defn is-scope-format-valid?
@@ -84,7 +84,9 @@
     {:path (string/split path #"/")
      :access (case access
                "read"  #{:read}
+               "r"     #{:read}
                "write" #{:write}
+               "w"     #{:write}
                "rw"    #{:read :write}
                nil     #{:read :write}
                #{})}))

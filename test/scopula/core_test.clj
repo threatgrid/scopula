@@ -7,6 +7,7 @@
   (is (sut/is-scope-format-valid? "foo/bar"))
   (is (sut/is-scope-format-valid? "foo-bar"))
   (is (sut/is-scope-format-valid? "foo.bar"))
+  (is (sut/is-scope-format-valid? "foo/bar:r"))
   (is (sut/is-scope-format-valid? "foo/bar:read"))
   (is (sut/is-scope-format-valid? "foo/bar:write"))
   (is (sut/is-scope-format-valid? "foo/bar:rw"))
@@ -26,6 +27,9 @@
   (is "foo" (sut/scope-root "foo"))
   (is "foo" (sut/scope-root "foo/bar"))
   (is "foo" (sut/scope-root "foo/bar:read"))
+  (is "foo" (sut/scope-root "foo/bar:r"))
+  (is "foo" (sut/scope-root "foo/bar:write"))
+  (is "foo" (sut/scope-root "foo/bar:w"))
   (is "foo" (sut/scope-root "foo:read"))
   (is "foo" (sut/scope-root "foo/bar/baz:read"))
   (is "foo-bar" (sut/scope-root "foo-bar/baz:read"))
@@ -38,12 +42,19 @@
 
 (deftest is-subscopes-test
   (is (sut/is-subscope? "foo" "foo"))
-  (is (sut/is-subscope? "foo:read" "foo"))
+  (is (sut/is-subscope? "foo:read"     "foo"))
+  (is (sut/is-subscope? "foo:r"        "foo"))
   (is (sut/is-subscope? "foo/bar:read" "foo"))
+  (is (sut/is-subscope? "foo/bar:r"    "foo"))
   (is (sut/is-subscope? "foo/bar:read" "foo/bar"))
   (is (sut/is-subscope? "foo/bar:read" "foo:read"))
+  (is (sut/is-subscope? "foo" "foo:rw"))
 
-  (is (not (sut/is-subscope? "root/foo" "foo"))))
+  (is (not (sut/is-subscope? "root/foo" "foo")))
+  (is (not (sut/is-subscope? "foo" "foo:r")))
+  (is (not (sut/is-subscope? "foo" "foo:read")))
+  (is (not (sut/is-subscope? "foo" "foo:w")))
+  (is (not (sut/is-subscope? "foo" "foo:write"))))
 
 (deftest accepted-by-scopes-test
 
@@ -80,17 +91,21 @@
     (is (not (sut/access-granted #{"foobar/baz"} #{"foo"}))))
   (testing "access are respected"
     (is (sut/access-granted #{"foo"}      #{"foo/bar:read"}     ))
+    (is (sut/access-granted #{"foo"}      #{"foo/bar:r"}        ))
     (is (sut/access-granted #{"foo"}      #{"foo/bar/baz:write"}))
+    (is (sut/access-granted #{"foo"}      #{"foo/bar/baz:w"}    ))
     (is (sut/access-granted #{"foo"}      #{"foo/bar/baz:rw"}   ))
     (is (sut/access-granted #{"foo"}      #{"foo/bar/baz:rw"}   ))
     (is (sut/access-granted #{"foo:read"} #{"foo/bar/baz:read"} ))
     (is (not (sut/access-granted #{"foo:read"} #{"foo/bar/baz:write"})))
     (is (sut/access-granted #{"foo" "bar"} #{"foo/bar:read"}))
     (is (sut/access-granted #{"foo" "bar"}      #{"foo/bar/baz:write"}))
+    (is (sut/access-granted #{"foo" "bar"}      #{"foo/bar/baz:w"}    ))
     (is (sut/access-granted #{"foo" "bar"}      #{"foo/bar/baz:rw"}   ))
     (is (sut/access-granted #{"foo" "bar"}      #{"foo/bar/baz:rw"}   ))
     (is (sut/access-granted #{"foo:read" "bar"} #{"foo/bar/baz:read"} ))
     (is (not (sut/access-granted #{"foo:read" "bar"} #{"foo/bar/baz:write"})))
+    (is (not (sut/access-granted #{"foo:read" "bar"} #{"foo/bar/baz:w"})))
     (is (sut/access-granted #{"foo" "bar"} #{"foo/bar:read" "bar"}     ))
     (is (sut/access-granted #{"foo" "bar"} #{"foo/bar/baz:write" "bar"}))
     (is (sut/access-granted #{"foo" "bar"} #{"foo/bar/baz:rw" "bar"}   ))
@@ -106,6 +121,9 @@
 (deftest is-root-scope-test
   (is (sut/is-root-scope? "foo"))
   (is (sut/is-root-scope? "foo:read"))
+  (is (sut/is-root-scope? "foo:r"))
+  (is (sut/is-root-scope? "foo:write"))
+  (is (sut/is-root-scope? "foo:w"))
   (is (not (sut/is-root-scope? "foo/bar:read")))
   (is (not (sut/is-root-scope? "foo/bar")))
   (is (not (sut/is-root-scope? "foo/bar/baz"))))
@@ -114,6 +132,10 @@
   (is (= #{"foo/bar"}
          (sut/normalize-scopes #{"foo/bar/baz:read"
                                  "foo/bar:write"
+                                 "foo/bar"})))
+  (is (= #{"foo/bar"}
+         (sut/normalize-scopes #{"foo/bar/baz:r"
+                                 "foo/bar:w"
                                  "foo/bar"})))
   (is (= #{"foo/bar"}
          (sut/normalize-scopes #{"foo/bar:read"
@@ -134,6 +156,15 @@
 
   (is (= #{"foo"}
          (sut/add-scope "foo:read" #{"foo:write"})))
+
+  (is (= #{"foo"}
+         (sut/add-scope "foo:read" #{"foo:w"})))
+
+  (is (= #{"foo"}
+         (sut/add-scope "foo:r" #{"foo:write"})))
+
+  (is (= #{"foo"}
+         (sut/add-scope "foo:r" #{"foo:w"})))
 
   (is (= #{"foo/bar" "root"}
          (sut/add-scope "foo/bar:read" #{"foo/bar" "root"}))
@@ -171,6 +202,9 @@
 
 (deftest scope-difference-test
   (is (= #{} (sut/scope-difference #{"foo:read"}
+                                   #{"foo:read"})))
+
+  (is (= #{} (sut/scope-difference #{"foo:r"}
                                    #{"foo:read"})))
 
   (is (= #{"baz"}
@@ -236,6 +270,9 @@
     (is (sut/scopes-superset? #{"foo"} #{"foo/foo-1"}))
     (is (sut/scopes-superset? #{"foo"} #{"foo/foo-1:read"}))
     (is (sut/scopes-superset? #{"foo"} #{"foo:read"}))
+    (is (sut/scopes-superset? #{"foo"} #{"foo:r"}))
+    (is (sut/scopes-superset? #{"foo"} #{"foo:write"}))
+    (is (sut/scopes-superset? #{"foo"} #{"foo:w"}))
     (is (sut/scopes-superset? #{"foo"} #{"foo:read" "foo/foo-1"}))
     (is (not (sut/scopes-superset? #{"foo:read"}
                                    #{"foo:read" "foo/foo-1"}))))
@@ -257,8 +294,8 @@
     (is (sut/scopes-subset? #{"foo/foo-1:read"} #{"foo"}))
     (is (sut/scopes-subset? #{"foo:read"} #{"foo"}))
     (is (sut/scopes-subset? #{"foo:read" "foo/foo-1"} #{"foo"}))
-    (is (not (sut/scopes-subset? #{"foo:read" "foo/foo-1"}
-                                   #{"foo:read"}))))
+    (is (not (sut/scopes-subset? #{"foo:r" "foo/foo-1"}
+                                 #{"foo:read"}))))
   (testing "un-normalized scopes"
     (is (sut/scopes-subset? #{"foo:read" "foo/foo-1"}
                             #{"foo:read" "foo:write"}))))
@@ -266,16 +303,20 @@
 (deftest scopes-missing-test
   (is (= #{"foo/foo-1"}
          (sut/scopes-missing #{"foo:read" "foo/foo-1"}
-                                #{"foo:read"})))
+                             #{"foo:r"})))
 
   (is (= #{} (sut/scopes-missing #{"foo:read"}
-                                    #{"foo:read"})))
+                                 #{"foo:r"})))
   (is (= #{"baz"}
          (sut/scopes-missing #{"foo" "bar" "baz"}
-                                #{"foo" "bar"})))
+                             #{"foo" "bar"})))
   (is (= #{"baz" "bar/bar-1"}
          (sut/scopes-missing #{"foo" "bar/bar-1" "baz"}
-                                #{"foo" "bar:read"}))))
+                             #{"foo" "bar:read"})))
+
+  (is (= #{"bar:read"}
+         (sut/scopes-missing #{"foo" "bar:r"}
+                             #{"foo" "bar:w"}))))
 
 (deftest scope-intersection-test
   (is (= "foo/bar:write"
@@ -284,7 +325,7 @@
 
 (deftest scopes-interception-test
   (is (= #{"foo/bar:write"}
-         (sut/scopes-intersection #{"foo:write" "bar:read"}
+         (sut/scopes-intersection #{"foo:w" "bar:read"}
                                   #{"foo/bar" "bar:write"})))
   (is (= #{"bar" "foo/bar:write"}
          (sut/scopes-intersection #{"foo:write" "bar:read" "bar:write"}
