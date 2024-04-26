@@ -50,9 +50,17 @@
   mean we should know all the sub-paths of some root-scope and add the difference.
 
   Scope are additive by nature."
+  (:refer-clojure :exclude [format])
   (:require
-   [clojure.set :as set]
-   [clojure.string :as string]))
+    #?(:cljs [goog.string :as gstring])
+    #?(:cljs [goog.string.format])
+    [clojure.set :as set]
+    [clojure.string :as string])
+  #?(:clj (:import [clojure.lang ExceptionInfo])) )
+
+(def format
+  #?(:cljs gstring/format
+     :clj clojure.core/format ) )
 
 (def allowed-chars-no-colon-no-slash "[!#-.0-9;-\\[\\]-~]")
 
@@ -463,7 +471,7 @@
   "Same as scope expand but return nil instead of throwing and exception if a scope alias is missing"
   [scopes aliases]
   (try (scopes-expand scopes aliases)
-       (catch clojure.lang.ExceptionInfo e
+       (catch ExceptionInfo e
          (if (= ::scopes-expand-missing-alias (-> e ex-data :type))
            nil
            (throw e)))))
@@ -473,7 +481,7 @@
   (let [[alias-name sd] (first (keep (fn [[alias-name ss]]
                                         (when (scopes-subset? ss scopes)
                                           (try [alias-name (scope-difference scopes ss)]
-                                               (catch Exception _ nil))))
+                                               (catch #?(:clj Exception :cljs js/Error) _ nil))))
                                      sorted-aliases))]
     (if alias-name
       (conj sd alias-name)
