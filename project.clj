@@ -1,4 +1,4 @@
-(defproject threatgrid/scopula "0.3.2"
+(defproject threatgrid/scopula "0.3.3-SNAPSHOT"
   :description "Offers a scope convention mechanism to enhance control access."
   :url "https://github.com/threatgrid/scopula"
   :license {:name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0"
