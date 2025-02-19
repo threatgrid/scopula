@@ -375,6 +375,11 @@
          (sut/scopes-compress #{"foo" "bar" "baz" "x"}
                               {"+admin" #{"foo" "bar"}
                                "+baz" #{"baz:read"}})))
+  (is (= #{"+admin" "baz"}
+         (sut/scopes-compress #{"foo" "bar" "baz"}
+                              {"+admin" #{"foo" "bar"}
+                               "+foo" #{}}))
+      "Test with an alias that should never be shown because the list is empty")
   (is (= #{"foo" "bar" "baz" "+admin"}
          (sut/scopes-compress #{"foo" "bar" "baz" "x" "very-very-long-scope-name"}
                               {"+admin" #{"x" "very-very-long-scope-name"}

@@ -479,9 +479,9 @@
 (defn- scopes-compress-first
   [scopes sorted-aliases]
   (let [[alias-name sd] (first (keep (fn [[alias-name ss]]
-                                        (when (scopes-subset? ss scopes)
-                                          (try [alias-name (scope-difference scopes ss)]
-                                               (catch #?(:clj Exception :cljs js/Error) _ nil))))
+                                       (when (and (scopes-subset? ss scopes) (not-empty ss))
+                                         (try [alias-name (scope-difference scopes ss)]
+                                              (catch #?(:clj Exception :cljs js/Error) _ nil))))
                                      sorted-aliases))]
     (if alias-name
       (conj sd alias-name)
