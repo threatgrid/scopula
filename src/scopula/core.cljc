@@ -109,13 +109,18 @@
 (defn is-sub-list?
   "Does `super-lst` begin with `lst`?"
   [lst super-lst]
-  (let [n (count lst)]
-    (= (take n super-lst) lst)))
+  (loop [l1 (seq lst)
+         l2 (seq super-lst)]
+    (cond
+      (nil? l1) true
+      (nil? l2) false
+      (= (first l1) (first l2)) (recur (next l1) (next l2))
+      :else false)))
 
 (defn repr-is-subscope?
   "Returns whether the `scope-to-check` is a subscope of the `super-scope`"
   [scope-to-check super-scope]
-  (and (set/superset? (:access super-scope) (:access scope-to-check))
+  (and (every? (:access super-scope) (:access scope-to-check))
        (is-sub-list? (:path super-scope) (:path scope-to-check))))
 
 (defn is-subscope?
