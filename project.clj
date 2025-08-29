@@ -10,9 +10,12 @@
                         ["snapshots" {:url "https://clojars.org/repo" :creds :gpg}]]
   :repl-options {:init-ns scopula.core }
   :plugins [[lein-cljsbuild "1.1.8"]]
+  :profiles {:benchmarks {:dependencies [[criterium "0.4.6"]
+                                         [com.clojure-goes-fast/clj-memory-meter "0.4.0"]]
+                          :source-paths ["benchmark"]
+                          :jvm-opts ["-Djdk.attach.allowAttachSelf"
+                                     "-XX:+EnableDynamicAgentLoading"
+                                     ]}}
   :cljsbuild {:source-paths ["src"]
               :compiler {:optimizations :whitespace
-                         :pretty-print false
-                         } 
-              }
-  )
+                         :pretty-print false}})
